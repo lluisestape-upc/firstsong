@@ -1,0 +1,16 @@
+.env
+__pycache__/
+*.pyc
+node_modules/
+frontend/dist/
+backend/cache/*
+!backend/cache/.gitkeep
+assets/demo/*
+!assets/demo/.gitkeep
+venv/
+dist_static/
+# Never commit source music or generated stems: copyright, and size.
+*.mp3
+*.wav
+*.flac
+*.m4a

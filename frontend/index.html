@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>First Song</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+
+    <div id="overlay" class="overlay">
+      <div class="card">
+        <p class="kicker">A world as a gift</p>
+        <h1 id="world-title">First Song</h1>
+        <p id="world-dedication" class="dedication">for the kid I used to be</p>
+        <p class="hint">
+          Headphones. The song is not playing at you, it is standing around you.
+          Walk towards a shape and you turn that stem up.
+        </p>
+        <button id="enter" disabled>Loading the world…</button>
+        <p class="controls">W A S D to walk &middot; mouse to look &middot; Esc to let go</p>
+      </div>
+    </div>
+
+    <div id="hud" class="hud hidden">
+      <div id="stem-readout"></div>
+      <div id="meta"></div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,136 @@
+{
+  "_comment": "The art lives here. Edit freely, no code changes needed. Subjects are BARE noun phrases with no article: the template adds 'a'/'an'. Theme: 'a world as a gift, for the kid I used to be', so the vocabulary is childhood objects at monument scale.",
+  "template": "{article} {size} {subject}, built from {material}, {condition}, {style}",
+  "roles": {
+    "drums": {
+      "subject": [
+        "stack of tin drums and bicycle wheels",
+        "playground climbing frame",
+        "scaffold of swing sets welded together"
+      ],
+      "hue_base": 18
+    },
+    "bass": {
+      "subject": [
+        "sleeping stone animal half sunk into the earth",
+        "mossy boulder shaped like a sofa",
+        "upturned hull of a buried wooden boat"
+      ],
+      "hue_base": 265
+    },
+    "other": {
+      "subject": [
+        "tree grown out of brass instruments and copper pipes",
+        "chandelier of hanging toys and music boxes",
+        "spiral staircase of stacked books and radios"
+      ],
+      "hue_base": 140
+    },
+    "vocals": {
+      "subject": [
+        "child-sized figure folded from paper lanterns",
+        "lit paper lantern on a tall thin pole",
+        "empty wooden chair with a glowing coat draped over it"
+      ],
+      "hue_base": 45
+    },
+    "guitar": {
+      "subject": [
+        "washing line strung with paper kites",
+        "fence woven from bicycle spokes and fishing wire",
+        "row of wind chimes hung from a dead tree"
+      ],
+      "hue_base": 8
+    },
+    "piano": {
+      "subject": [
+        "upright piano with the front panel removed, ivy in the strings",
+        "staircase of piano keys climbing into nothing",
+        "music stand holding an open book the size of a door"
+      ],
+      "hue_base": 205
+    }
+  },
+  "bands": {
+    "brightness": [
+      {
+        "max": 0.33,
+        "words": [
+          "rusted iron",
+          "dark waxed wood",
+          "wet grey clay"
+        ]
+      },
+      {
+        "max": 0.66,
+        "words": [
+          "weathered painted metal",
+          "sun-bleached plastic",
+          "worn brass"
+        ]
+      },
+      {
+        "max": 1.01,
+        "words": [
+          "polished chrome",
+          "frosted glass",
+          "white enamel"
+        ]
+      }
+    ],
+    "density": [
+      {
+        "max": 0.33,
+        "words": [
+          "solitary",
+          "quiet",
+          "sparse"
+        ]
+      },
+      {
+        "max": 0.66,
+        "words": [
+          "modest",
+          "layered",
+          "many-part"
+        ]
+      },
+      {
+        "max": 1.01,
+        "words": [
+          "sprawling",
+          "towering",
+          "densely tangled"
+        ]
+      }
+    ],
+    "noisiness": [
+      {
+        "max": 0.33,
+        "words": [
+          "smooth and carefully repaired",
+          "clean-edged and intact",
+          "freshly painted"
+        ]
+      },
+      {
+        "max": 0.66,
+        "words": [
+          "chipped and scuffed",
+          "lightly overgrown with ivy",
+          "faded by sun"
+        ]
+      },
+      {
+        "max": 1.01,
+        "words": [
+          "frayed and overgrown with weeds",
+          "cracked and peeling",
+          "half collapsed"
+        ]
+      }
+    ]
+  },
+  "style_suffix": "single isolated object on a plain background, soft diffuse light, nostalgic childhood memory, matte painterly textures, no text",
+  "negative_prompt": "text, watermark, people, photorealistic skin, gore, weapons, logos, background scenery"
+}

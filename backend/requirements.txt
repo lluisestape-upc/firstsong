@@ -1,0 +1,13 @@
+# Python 3.11. torch/demucs/librosa/soundfile are already in the global env
+# on this machine (shared with AirStems); the rest are small.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+requests>=2.32
+python-dotenv>=1.0
+numpy
+soundfile>=0.13
+librosa>=0.11
+# Separation (heavy, skip with --stems to reuse existing stems):
+# demucs>=4.0.1
+# torch>=2.0
