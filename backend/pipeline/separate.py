@@ -58,8 +58,12 @@ def separate(path: str | pathlib.Path, out_dir: pathlib.Path,
 
 
 def copy_existing(stem_dir: pathlib.Path, out_dir: pathlib.Path) -> pathlib.Path:
-    """Reuse a folder of stems that already exists (e.g. from AirStems)."""
+    """Reuse a folder of stems that already exists (e.g. from AirStems, or a
+    previous run's own _work dir when re-analysing without re-separating)."""
     out_dir.mkdir(parents=True, exist_ok=True)
+    if stem_dir.resolve() == out_dir.resolve():
+        return out_dir            # already in place, nothing to copy
+
     for name in config.STEMS:
         for ext in (".wav", ".flac", ".mp3"):
             src = stem_dir / f"{name}{ext}"

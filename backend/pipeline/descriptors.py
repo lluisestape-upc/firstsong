@@ -69,11 +69,25 @@ def analyse_stem(path: pathlib.Path, sr: int = 22050) -> dict:
     }
 
 
+def _fold_tempo(bpm: float, lo: float = 60.0, hi: float = 140.0) -> float:
+    """Beat trackers routinely report a double or half of the felt tempo, which
+    on a rubato ballad is the usual case rather than the exception. Fold the
+    estimate into the range people actually count in."""
+    if bpm <= 0:
+        return 0.0
+    while bpm > hi:
+        bpm /= 2
+    while bpm < lo:
+        bpm *= 2
+    return bpm
+
+
 def analyse_mix(path: pathlib.Path, sr: int = 22050) -> dict:
     """Song-level descriptors, taken from the original mix."""
     y, sr = librosa.load(str(path), sr=sr, mono=True)
-    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-    tempo = float(np.atleast_1d(tempo)[0])
+    tempo_raw, _ = librosa.beat.beat_track(y=y, sr=sr)
+    tempo_raw = float(np.atleast_1d(tempo_raw)[0])
+    tempo = _fold_tempo(tempo_raw)
 
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr).mean(axis=1)
     key = PITCH_CLASSES[int(np.argmax(chroma))]
@@ -82,7 +96,33 @@ def analyse_mix(path: pathlib.Path, sr: int = 22050) -> dict:
 
     return {
         "tempo": round(tempo, 1),
+        "tempo_raw": round(tempo_raw, 1),
         "key": key,
         "duration": round(float(len(y) / sr), 2),
         "brightness": round(_log_norm(centroid, CENTROID_MIN_HZ, CENTROID_MAX_HZ), 3),
     }
+
+
+def relativise(per_stem: dict, keys=("density", "noisiness")) -> dict:
+    """Rescale the named descriptors across the stems of ONE song.
+
+    Absolute scales are calibrated on band music; on a ballad every stem lands
+    in the same band and every monument gets the same adjective. What the world
+    needs is not "how dense is this in absolute terms" but "which of these six
+    is the busiest". Rank-based, so a single outlier cannot squash the rest.
+
+    The absolute value is kept alongside as <key>_abs.
+    """
+    names = [n for n, f in per_stem.items() if not f.get("silent")]
+    if len(names) < 2:
+        return per_stem
+
+    for key in keys:
+        order = sorted(names, key=lambda n: per_stem[n].get(key, 0.0))
+        last = len(order) - 1
+        for rank, name in enumerate(order):
+            features = per_stem[name]
+            features[f"{key}_abs"] = features.get(key, 0.0)
+            # Spread over 0.08..0.95 so the top and bottom bands are reachable.
+            features[key] = round(0.08 + 0.87 * (rank / last), 3)
+    return per_stem

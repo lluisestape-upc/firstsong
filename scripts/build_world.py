@@ -28,6 +28,9 @@ def main():
     parser.add_argument("--model", default=None,
                         help="demucs model: htdemucs (4 stems) or htdemucs_6s "
                              "(adds guitar + piano, better on orchestral tracks)")
+    parser.add_argument("--keep-quiet", action="store_true",
+                        help="keep stems that are near-silent relative to the "
+                             "loudest one (dropped by default)")
     parser.add_argument("--environment", default="auto",
                         choices=["auto", "procedural", "worldlabs"])
     args = parser.parse_args()
@@ -41,6 +44,7 @@ def main():
         reuse_stems=pathlib.Path(args.stems) if args.stems else None,
         dedication=args.dedication,
         demucs_model=args.model,
+        quiet_floor=0.0 if args.keep_quiet else 0.08,
     )
 
 

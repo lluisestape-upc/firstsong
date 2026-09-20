@@ -64,6 +64,7 @@ def build_world(source: str | pathlib.Path,
                 reuse_stems: pathlib.Path | None = None,
                 dedication: str = "",
                 demucs_model: str | None = None,
+                quiet_floor: float = 0.08,
                 log=print) -> dict:
     source = pathlib.Path(source)
     title = title or source.stem
@@ -101,16 +102,34 @@ def build_world(source: str | pathlib.Path,
         stems = []
         present = [s for s in STEM_ORDER if (work_dir / f"{s}.wav").exists()]
 
-        for index, name in enumerate(present):
-            raw = work_dir / f"{name}.wav"
-            features = descriptors.analyse_stem(raw)
+        # Analyse everything first: the size and condition adjectives are
+        # decided by how the stems compare to EACH OTHER, not to a constant.
+        analysed = {}
+        for name in present:
+            features = descriptors.analyse_stem(work_dir / f"{name}.wav")
             if features.get("silent"):
                 log(f"      {name}: silent, skipped")
                 continue
+            analysed[name] = features
 
+        # A stem far quieter than the loudest one is never audible in the mix:
+        # its monument would occupy a slot, add download weight and never
+        # react. Drop it rather than ship a dead object. --keep-quiet disables.
+        if analysed and quiet_floor > 0:
+            loudest = max(f["loudness"] for f in analysed.values())
+            for name in list(analysed):
+                ratio = analysed[name]["loudness"] / loudest if loudest else 1.0
+                if ratio < quiet_floor:
+                    log(f"      {name}: dropped, {ratio:.1%} of the loudest stem")
+                    del analysed[name]
+
+        descriptors.relativise(analysed)
+
+        for index, (name, features) in enumerate(analysed.items()):
+            raw = work_dir / f"{name}.wav"
             duration = _encode_mono_mp3(raw, world_dir / "stems" / f"{name}.mp3")
             prompt = prompts.build_prompt(name, features, title, vocab)
-            placement = prompts.place(name, index, len(present), features, mix["key"])
+            placement = prompts.place(name, index, len(analysed), features, mix["key"])
 
             stems.append({
                 "name": name,
