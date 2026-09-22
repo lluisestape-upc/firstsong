@@ -141,3 +141,7 @@ button:disabled { opacity: 0.45; cursor: progress; }
     color: #d8b26a;
   }
 }
+
+/* A stem you are carrying, and one whose monument has been silenced. */
+.stem.held .name { color: var(--ink); font-weight: 600; }
+.stem.held .bar { box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.35); }

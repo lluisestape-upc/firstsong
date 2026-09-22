@@ -54,8 +54,12 @@ export class Stage extends EventTarget {
     const canvas = this.canvas;
 
     document.addEventListener('keydown', (event) => {
+      if (event.repeat) return;
       this.keys.add(event.code);
-      if (event.code === 'Escape' && this.active && !this.captured) this.exit();
+      if (!this.active) return;
+      if (event.code === 'Escape' && !this.captured) this.exit();
+      if (event.code === 'KeyE') this.dispatchEvent(new Event('takeOrPlace'));
+      if (event.code === 'KeyQ') this.dispatchEvent(new Event('hushOrWake'));
     });
     document.addEventListener('keyup', (event) => this.keys.delete(event.code));
 
@@ -64,8 +68,21 @@ export class Stage extends EventTarget {
       if (!this.captured && this.active) this.exit();
     });
 
-    canvas.addEventListener('mousedown', () => {
-      if (this.active && !this.captured) this.dragging = true;
+    canvas.addEventListener('mousedown', (event) => {
+      if (!this.active) return;
+      // Captured pointer: clicks are interaction. Drag-look mode: the left
+      // button is already steering, so only the right button interacts.
+      if (this.captured) {
+        if (event.button === 0) this.dispatchEvent(new Event('takeOrPlace'));
+        if (event.button === 2) this.dispatchEvent(new Event('hushOrWake'));
+      } else if (event.button === 2) {
+        this.dispatchEvent(new Event('takeOrPlace'));
+      } else {
+        this.dragging = true;
+      }
+    });
+    canvas.addEventListener('contextmenu', (event) => {
+      if (this.active) event.preventDefault();
     });
     window.addEventListener('mouseup', () => { this.dragging = false; });
 

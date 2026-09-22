@@ -2,6 +2,8 @@ import { Stage } from './scene.js';
 import { SpatialMix } from './audio.js';
 import { buildEnvironment } from './environment.js';
 import { buildMonument } from './monuments.js';
+import { Interaction } from './interaction.js';
+import { Trail } from './trail.js';
 import { cacheUrl, getWorld, resolveWorldId } from './api.js';
 
 const dom = {
@@ -51,6 +53,11 @@ async function boot() {
   // Pair each monument with its stem by name.
   const byName = new Map(mix.stems.map((stem) => [stem.spec.name, stem]));
 
+  const interaction = new Interaction(stage, mix, monuments);
+  const trail = new Trail(stage.scene, world.environment.sky_bottom);
+  stage.addEventListener('takeOrPlace', () => interaction.takeOrPlace());
+  stage.addEventListener('hushOrWake', () => interaction.hushOrWake());
+
   dom.enter.disabled = false;
   dom.enter.textContent = 'Step inside';
   dom.enter.addEventListener('click', () => {
@@ -66,8 +73,8 @@ async function boot() {
     // One frame later the pointerlockchange event has settled.
     setTimeout(() => {
       dom.controls.textContent = stage.needsDragHint
-        ? 'W A S D to walk · drag to look · Esc to let go'
-        : 'W A S D to walk · mouse to look · Esc to let go';
+        ? 'W A S D to walk · drag to look · E take · Q hush · Esc to let go'
+        : 'W A S D to walk · mouse to look · E take · Q hush · Esc to let go';
     }, 120);
   });
   stage.addEventListener('exit', () => {
@@ -78,7 +85,7 @@ async function boot() {
 
   // Handy from the devtools console while tuning the mapping:
   //   __firstsong.mix.stems.map(s => [s.spec.name, s.level])
-  window.__firstsong = { stage, mix, world, monuments, environment };
+  window.__firstsong = { stage, mix, world, monuments, environment, interaction, trail };
 
   let elapsed = 0;
   function frame() {
@@ -87,11 +94,13 @@ async function boot() {
     elapsed += dt;
 
     stage.step(dt);
+    interaction.update();
     mix.update(stage.camera);
+    if (stage.active) trail.update(stage.camera.position);
 
     for (const monument of monuments) {
       const stem = byName.get(monument.spec.name);
-      monument.pulse(stem ? stem.level : 0, elapsed);
+      monument.pulse(stem ? stem.level : 0, elapsed, dt);
     }
 
     if (mix.playing) {
@@ -99,9 +108,13 @@ async function boot() {
       dom.readout.innerHTML = mix.stems
         .map((stem) => {
           const width = Math.round(stem.level * 100);
-          const strong = stem === loudest ? ' strong' : '';
-          return `<div class="stem${strong}">
-                    <span class="dot" style="background:${stem.spec.colour}"></span>
+          const held = interaction.carrying?.spec.name === stem.spec.name;
+          const near = interaction.focus?.spec.name === stem.spec.name;
+          const strong = held || near || stem === loudest ? ' strong' : '';
+          const dot = stem.muted ? 'transparent' : stem.spec.colour;
+          const ring = stem.muted ? `box-shadow:inset 0 0 0 1px ${stem.spec.colour}` : '';
+          return `<div class="stem${strong}${held ? ' held' : ''}">
+                    <span class="dot" style="background:${dot};${ring}"></span>
                     <span class="name">${stem.spec.name}</span>
                     <span class="bar"><i style="width:${width}%;background:${stem.spec.colour}"></i></span>
                   </div>`;

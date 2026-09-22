@@ -82,6 +82,10 @@ export async function buildMonument(spec, baseUrl) {
   const glow = new THREE.PointLight(new THREE.Color(spec.colour || '#ffffff'), 0, 24, 2);
   group.add(glow);
 
+  // Remember the resting look so the hushed and carried states can return to it.
+  const restColour = new THREE.Color(spec.colour || '#ffffff');
+  const hushColour = restColour.clone().lerp(new THREE.Color('#202225'), 0.72);
+
   return {
     spec,
     group,
@@ -90,13 +94,60 @@ export async function buildMonument(spec, baseUrl) {
     glow,
     baseY: y,
     baseScale,
+
+    // set by the interaction layer
+    carried: false,
+    hushed: false,
+    /** 0 at rest, 1 fully carried. Smoothed so pick-up and drop are not a snap. */
+    lift: 0,
+    /** 0 awake, 1 fully hushed. */
+    dim: 0,
+
+    /** Where this monument stands now. Changes when the player puts it down. */
+    setPosition(x, y, z) {
+      group.position.set(x, y, z);
+      this.baseY = y;
+      halo.position.y = -y + 0.02;
+    },
+
     /** stem.level is 0..1 from the analyser. */
-    pulse(level, elapsed) {
-      body.scale.setScalar(baseScale * (1 + level * 0.14));
-      body.rotation.y = elapsed * 0.08;
-      group.position.y = this.baseY + Math.sin(elapsed * 0.6) * 0.12 + level * 0.25;
-      halo.material.opacity = 0.12 + level * 0.55;
-      glow.intensity = level * 14;
+    pulse(level, elapsed, dt = 1 / 60) {
+      // Ease towards the target states rather than switching, so a monument
+      // visibly wakes up or settles instead of popping.
+      const ease = Math.min(1, dt * 6);
+      this.lift += ((this.carried ? 1 : 0) - this.lift) * ease;
+      this.dim += ((this.hushed ? 1 : 0) - this.dim) * ease;
+
+      const awake = 1 - this.dim;
+      const beat = level * awake;
+
+      body.scale.setScalar(baseScale * (1 + beat * 0.14 + this.lift * 0.08));
+      // A carried monument spins a little faster: it reads as "in your hands".
+      body.rotation.y = elapsed * (0.08 + this.lift * 0.5);
+
+      if (!this.carried) {
+        group.position.y = this.baseY
+          + Math.sin(elapsed * 0.6) * (0.12 + this.lift * 0.3)
+          + beat * 0.25;
+      }
+
+      halo.material.opacity = (0.12 + beat * 0.55) * (1 - this.dim * 0.85)
+        + this.lift * 0.25;
+      glow.intensity = beat * 14 + this.lift * 6;
+
+      // Colour carries the hushed state on both the body and its halo.
+      body.traverse((node) => {
+        if (node.isMesh && node.material && node.material.color) {
+          if (!node.userData.restColour) {
+            node.userData.restColour = node.material.color.clone();
+            node.userData.hushColour = node.material.color.clone()
+              .lerp(new THREE.Color('#202225'), 0.72);
+          }
+          node.material.color.copy(node.userData.restColour)
+            .lerp(node.userData.hushColour, this.dim);
+        }
+      });
+      halo.material.color.copy(restColour).lerp(hushColour, this.dim);
     },
   };
 }

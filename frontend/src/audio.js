@@ -44,6 +44,16 @@ function setListener(listener, position, forward, up) {
   }
 }
 
+function writePannerPosition(panner, x, y, z) {
+  if (isParam(panner.positionX)) {
+    panner.positionX.value = x;
+    panner.positionY.value = y;
+    panner.positionZ.value = z;
+  } else {
+    panner.setPosition(x, y, z);
+  }
+}
+
 export class SpatialMix {
   constructor(rolloff = DEFAULT_ROLLOFF) {
     this.ctx = null;
@@ -51,6 +61,30 @@ export class SpatialMix {
     this.playing = false;
     this.startedAt = 0;
     this.rolloff = rolloff;
+  }
+
+  /** Move a stem's source. This is what makes carrying a monument audible. */
+  setStemPosition(stem, x, y, z) {
+    writePannerPosition(stem.panner, x, y, z);
+  }
+
+  /**
+   * Silence or wake a stem. Ramped rather than switched: a gain that jumps
+   * straight to zero puts a click through the whole mix.
+   */
+  setStemMuted(stem, muted, seconds = 0.12) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const gain = stem.gain.gain;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(gain.value, now);
+    gain.linearRampToValueAtTime(muted ? 0.0001 : 1.0, now + seconds);
+    stem.muted = muted;
+  }
+
+  toggleStemMuted(stem) {
+    this.setStemMuted(stem, !stem.muted);
+    return stem.muted;
   }
 
   /** Change the distance falloff on every stem at once, while playing. */
@@ -97,14 +131,7 @@ export class SpatialMix {
         panner.refDistance = spec.ref_distance ?? 4;
         panner.maxDistance = spec.max_distance ?? 30;
         panner.rolloffFactor = this.rolloff;
-        const [x, y, z] = spec.position;
-        if (isParam(panner.positionX)) {
-          panner.positionX.value = x;
-          panner.positionY.value = y;
-          panner.positionZ.value = z;
-        } else {
-          panner.setPosition(x, y, z);
-        }
+        writePannerPosition(panner, ...spec.position);
 
         const analyser = this.ctx.createAnalyser();
         analyser.fftSize = 1024;
@@ -124,6 +151,7 @@ export class SpatialMix {
           bins: new Uint8Array(analyser.fftSize),
           level: 0,
           source: null,
+          muted: false,
         };
       })
     );
