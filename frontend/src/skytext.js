@@ -57,6 +57,7 @@ export class SkyText {
     this.instruction = null;
     this.instructionUntil = 0;
     this.announcement = null;
+    this.sign = null;
     this.elapsed = 0;
     scene.add(this.group);
   }
@@ -72,6 +73,31 @@ export class SkyText {
     this.instruction.position.copy(this.camera.position);
     this.group.add(this.instruction);
     this.instructionUntil = this.elapsed + seconds;
+  }
+
+  /**
+   * A sign, not a line of narration: it is written at one place in the world
+   * and stays there. It does not drift with where you are looking, it does not
+   * fade on a timer, and it does not come back when you move. Each level of
+   * Pulse hangs one over the platform its run starts from, and it hangs there
+   * until the next level replaces it.
+   */
+  pin(text, position, { height = 5.5, size = 62, scale = 0.38 } = {}) {
+    this.unpin();
+    this.sign = textPlane(text, { size, opacity: 0, italic: true });
+    // Small: a pinned line is read from one place at one distance, so it can
+    // be sized for that. The lines that follow the camera have to be huge
+    // because they are read from anywhere.
+    this.sign.scale.setScalar(scale);
+    this.sign.position.set(position.x, position.y + height, position.z);
+    this.group.add(this.sign);
+    return this.sign;
+  }
+
+  unpin() {
+    if (!this.sign) return;
+    this.group.remove(this.sign);
+    this.sign = null;
   }
 
   /** Cut it short: the player has clearly understood. */
@@ -121,6 +147,17 @@ export class SkyText {
         this.group.remove(this.instruction);
         this.instruction = null;
       }
+    }
+
+    if (this.sign) {
+      const s = this.sign.material;
+      // Fades up once and then holds, with no breath in it: a sign that
+      // pulsed would read as something arriving rather than something there.
+      if (s.opacity < 0.46) s.opacity += Math.min(1, dt * 1.2) * (0.5 - s.opacity);
+      // Only the facing follows you, so the words stay legible from the
+      // approach; where they hang never moves.
+      this.sign.lookAt(this.camera.position.x, this.sign.position.y,
+                       this.camera.position.z);
     }
 
     if (this.announcement) {

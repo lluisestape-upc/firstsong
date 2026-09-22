@@ -12,6 +12,7 @@ import * as THREE from 'three';
 
 const WINDOW = 0.16;          // seconds either side of a beat that still counts
 const RINGS = 8;
+const WEAK = 0.5;             // what a jump is worth with no beat behind it
 
 export class Beat {
   constructor(scene, beats, colour = '#ffffff') {
@@ -63,6 +64,18 @@ export class Beat {
   }
 
   /**
+   * How much of a jump the song is willing to give at this instant: all of it
+   * on the beat, half of it off. Pulse hangs its whole course on this — the
+   * weak jump is deliberately too low to clear the next step up.
+   */
+  liftAt(songTime) {
+    const offset = this.offsetFrom(songTime);
+    if (offset === null) return 1;
+    const accuracy = Math.max(0, 1 - Math.abs(offset) / WINDOW);
+    return WEAK + (1 - WEAK) * accuracy;
+  }
+
+  /**
    * Called when a jump lands. Returns how far off the beat it was, in seconds,
    * or null if there is nothing to be on.
    */
@@ -83,7 +96,9 @@ export class Beat {
     // answers, it just answers better when you are right.
     const ring = this.pool[this.next];
     this.next = (this.next + 1) % this.pool.length;
-    ring.mesh.position.set(position.x, 0.08, position.z);
+    // At the feet, wherever the feet are: on a course that is a platform
+    // eight metres up, not the plain underneath it.
+    ring.mesh.position.set(position.x, Math.max(0.08, position.y - 1.62), position.z);
     ring.mesh.scale.setScalar(1);
     ring.mesh.visible = true;
     ring.life = 1;

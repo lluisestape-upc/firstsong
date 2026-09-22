@@ -16,6 +16,11 @@ const JUMP_SPEED = 5.2;
 const GRAVITY = 14.0;
 const LOOK_SENSITIVITY = 0.0023;
 const PITCH_LIMIT = Math.PI / 2 - 0.05;
+// A rise this small is walked up rather than fallen off. It has to stay well
+// under the step between two platforms on a course, or you could walk the
+// whole climb without ever jumping.
+const STEP_UP = 0.3;
+const STEP_DOWN = 0.3;
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -47,9 +52,18 @@ export class Stage extends EventTarget {
     this.active = false;
     this.dragging = false;
     this.captured = false;
-    this.hop = 0;            // metres above eye height
+    this.altitude = 0;       // metres the feet stand above the plain
     this.hopVelocity = 0;
     this.airborne = false;
+
+    /**
+     * What is underfoot at a point, given where the feet are now. The plain is
+     * flat, so the default answer is always zero; Pulse swaps in its course and
+     * the same walker suddenly has platforms to miss.
+     */
+    this.groundAt = () => 0;
+    /** How much of a jump the world is willing to give. Pulse reads the beat. */
+    this.jumpPower = () => 1;
 
     this._bindInput();
     window.addEventListener('resize', () => this.resize());
@@ -66,7 +80,7 @@ export class Stage extends EventTarget {
       if (event.code === 'KeyE') this.dispatchEvent(new Event('takeOrPlace'));
       if (event.code === 'KeyQ') this.dispatchEvent(new Event('hushOrWake'));
       if (event.code === 'KeyF') this.dispatchEvent(new Event('soloStart'));
-      if (event.code === 'Space') this.jump();
+      if (event.code === 'Space') this.jump(this.jumpPower());
       if (event.code === 'KeyR') this.dispatchEvent(new Event('replay'));
     });
     document.addEventListener('keyup', (event) => {
@@ -120,10 +134,17 @@ export class Stage extends EventTarget {
     }, { passive: true });
   }
 
-  jump() {
-    if (!this.active || this.airborne) return;
-    this.hopVelocity = JUMP_SPEED;
+  /**
+   * `power` scales the launch. In Pulse an off-beat jump is worth about six
+   * tenths of one, which is not enough height to reach the next platform: the
+   * gate on the course is the song, not the geometry.
+   */
+  jump(power = 1) {
+    if (!this.active || this.airborne) return 0;
+    this.hopVelocity = JUMP_SPEED * power;
     this.airborne = true;
+    this.dispatchEvent(new CustomEvent('launch', { detail: { power } }));
+    return power;
   }
 
   /** Enter the world. Pointer lock if the browser allows it, drag-look if not. */
@@ -182,25 +203,51 @@ export class Stage extends EventTarget {
     this.velocity.lerp(this.move, blend);
     this.camera.position.addScaledVector(this.velocity, dt);
 
-    // Vertical: a hop, so there is a gesture available that is not walking.
+    const p = this.camera.position;
+
+    // Vertical. On the plain this is just a hop; on a course it is everything.
     if (this.airborne) {
+      const was = this.altitude;
       this.hopVelocity -= GRAVITY * dt;
-      this.hop += this.hopVelocity * dt;
-      if (this.hop <= 0) {
-        this.hop = 0;
+      this.altitude += this.hopVelocity * dt;
+      // Only ever land on something that was at or below the feet already, so
+      // a jump passes up through a platform instead of sticking to it.
+      const floor = this.groundAt(p.x, p.z, was);
+      if (this.hopVelocity <= 0 && this.altitude <= floor) {
+        this.altitude = floor;
         this.hopVelocity = 0;
         this.airborne = false;
-        this.dispatchEvent(new Event('land'));
+        this.dispatchEvent(new CustomEvent('land', {
+          detail: { altitude: floor },
+        }));
+      }
+    } else {
+      const floor = this.groundAt(p.x, p.z, this.altitude);
+      if (floor > this.altitude + STEP_UP) {
+        // Something overhead, not underfoot: keep walking beneath it.
+      } else if (floor < this.altitude - STEP_DOWN) {
+        this.airborne = true;              // walked off an edge
+        this.hopVelocity = 0;
+      } else {
+        this.altitude = floor;
       }
     }
 
-    const p = this.camera.position;
-    p.y = EYE_HEIGHT + this.hop;
+    p.y = EYE_HEIGHT + this.altitude;
     const distance = Math.hypot(p.x, p.z);
     if (distance > WORLD_LIMIT) {
       p.x *= WORLD_LIMIT / distance;
       p.z *= WORLD_LIMIT / distance;
     }
+  }
+
+  /** Put the walker down at a point, standing still. Used by Pulse respawns. */
+  placeAt(x, altitude, z) {
+    this.camera.position.set(x, EYE_HEIGHT + altitude, z);
+    this.altitude = altitude;
+    this.hopVelocity = 0;
+    this.airborne = false;
+    this.velocity.set(0, 0, 0);
   }
 
   render() {

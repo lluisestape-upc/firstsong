@@ -64,6 +64,9 @@ export async function buildMonument(spec, baseUrl) {
   // around it instead of fighting normaliseScale.
   const baseScale = body.scale.x;
   group.add(body);
+  // How far this thing sticks up above its own origin, so a course can be
+  // built over the whole skyline rather than through it.
+  const reach = new THREE.Box3().setFromObject(body).max.y;
 
   // A halo on the ground marking where this stem still reaches you.
   const halo = new THREE.Mesh(
@@ -94,6 +97,11 @@ export async function buildMonument(spec, baseUrl) {
     glow,
     baseY: y,
     baseScale,
+
+    /** The height of its highest point right now, in world metres. */
+    get top() {
+      return this.baseY + reach;
+    },
 
     // set by the interaction layer
     carried: false,

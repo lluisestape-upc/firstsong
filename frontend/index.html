@@ -59,32 +59,19 @@
 
           <button class="mode" data-mode="pulse" role="radio" aria-checked="false" aria-label="Pulse">
             <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
-              <path class="ground" d="M10 58 H110" />
               <g class="ticks">
-                <path d="M20 54 V62" /><path d="M44 54 V62" />
-                <path d="M68 54 V62" /><path d="M92 54 V62" />
+                <path d="M16 70 V74" style="--i:0"/><path d="M42 70 V74" style="--i:1"/>
+                <path d="M68 70 V74" style="--i:2"/><path d="M94 70 V74" style="--i:3"/>
               </g>
-              <g class="floor">
-                <ellipse cx="44" cy="58" rx="3" ry="1.2" class="floor-ring">
-                  <animate attributeName="rx" values="3;16" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
-                  <animate attributeName="ry" values="1.2;6" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.65;0" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
-                </ellipse>
-                <ellipse cx="68" cy="58" rx="3" ry="1.2" class="floor-ring">
-                  <animate attributeName="rx" values="3;16" dur="1.8s" begin="1.2s" repeatCount="indefinite"/>
-                  <animate attributeName="ry" values="1.2;6" dur="1.8s" begin="1.2s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.65;0" dur="1.8s" begin="1.2s" repeatCount="indefinite"/>
-                </ellipse>
-                <ellipse cx="92" cy="58" rx="3" ry="1.2" class="floor-ring">
-                  <animate attributeName="rx" values="3;16" dur="1.8s" begin="1.8s" repeatCount="indefinite"/>
-                  <animate attributeName="ry" values="1.2;6" dur="1.8s" begin="1.8s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.65;0" dur="1.8s" begin="1.8s" repeatCount="indefinite"/>
-                </ellipse>
+              <g class="steps">
+                <rect x="10" y="58" width="26" height="4" rx="2" style="--i:0"/>
+                <rect x="44" y="44" width="26" height="4" rx="2" style="--i:1"/>
+                <rect x="78" y="30" width="26" height="4" rx="2" style="--i:2"/>
               </g>
               <path id="hopPath" class="hop"
-                    d="M20 58 Q32 8 44 58 Q56 8 68 58 Q80 8 92 58" />
+                    d="M23 58 Q40 30 57 44 Q74 16 91 30" />
               <circle r="4" class="hopper">
-                <animateMotion dur="1.8s" repeatCount="indefinite">
+                <animateMotion dur="2.4s" repeatCount="indefinite">
                   <mpath href="#hopPath"/>
                 </animateMotion>
               </circle>
