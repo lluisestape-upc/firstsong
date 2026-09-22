@@ -19,8 +19,11 @@ cd "$ROOT"
 echo "==> building frontend"
 npm run build --prefix frontend
 
-echo "==> bundling worlds"
-"$PY" scripts/export_static.py
+# Only the worlds that are part of the submission: the others are test
+# fixtures and a chooser full of them reads as unfinished.
+WORLDS="${WORLDS:-my-way get-lucky billie-jean}"
+echo "==> bundling worlds: $WORLDS"
+"$PY" scripts/export_static.py --only $WORLDS
 
 # Pages runs Jekyll by default, which silently drops files it does not like.
 touch "$OUT/.nojekyll"

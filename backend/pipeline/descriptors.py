@@ -69,25 +69,41 @@ def analyse_stem(path: pathlib.Path, sr: int = 22050) -> dict:
     }
 
 
-def _fold_tempo(bpm: float, lo: float = 60.0, hi: float = 140.0) -> float:
+def _fold_tempo(bpm: float, lo: float = 60.0, hi: float = 140.0) -> tuple[float, int]:
     """Beat trackers routinely report a double or half of the felt tempo, which
     on a rubato ballad is the usual case rather than the exception. Fold the
-    estimate into the range people actually count in."""
+    estimate into the range people actually count in, and report the factor so
+    the beat instants can be folded the same way.
+
+    Returns (bpm, factor) where factor > 1 means the tracker was counting
+    subdivisions and only every `factor`-th instant is a felt beat.
+    """
     if bpm <= 0:
-        return 0.0
+        return 0.0, 1
+    factor = 1
     while bpm > hi:
         bpm /= 2
+        factor *= 2
     while bpm < lo:
         bpm *= 2
-    return bpm
+        factor = max(1, factor // 2)
+    return bpm, factor
 
 
 def analyse_mix(path: pathlib.Path, sr: int = 22050) -> dict:
     """Song-level descriptors, taken from the original mix."""
     y, sr = librosa.load(str(path), sr=sr, mono=True)
-    tempo_raw, _ = librosa.beat.beat_track(y=y, sr=sr)
+    tempo_raw, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
     tempo_raw = float(np.atleast_1d(tempo_raw)[0])
-    tempo = _fold_tempo(tempo_raw)
+    tempo, factor = _fold_tempo(tempo_raw)
+
+    # The actual beat instants, not just a rate: the world needs to know when
+    # the pulse lands, and a constant 60/BPM grid drifts on anything played by
+    # humans. Decimated by the same factor the tempo was folded by, or the
+    # world would ask you to jump on every subdivision. Rounded to
+    # milliseconds to keep the manifest small.
+    instants = librosa.frames_to_time(beat_frames, sr=sr)
+    beats = [round(float(t), 3) for t in instants[::factor]]
 
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr).mean(axis=1)
     key = PITCH_CLASSES[int(np.argmax(chroma))]
@@ -97,6 +113,7 @@ def analyse_mix(path: pathlib.Path, sr: int = 22050) -> dict:
     return {
         "tempo": round(tempo, 1),
         "tempo_raw": round(tempo_raw, 1),
+        "beats": beats,
         "key": key,
         "duration": round(float(len(y) / sr), 2),
         "brightness": round(_log_norm(centroid, CENTROID_MIN_HZ, CENTROID_MAX_HZ), 3),

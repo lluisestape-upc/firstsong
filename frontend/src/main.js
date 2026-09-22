@@ -7,6 +7,8 @@ import { Trail } from './trail.js';
 import { Pad } from './pad.js';
 import { SkyText } from './skytext.js';
 import { BlindGame } from './blind.js';
+import { Beat } from './beat.js';
+import { Recorder } from './recorder.js';
 import { cacheUrl, getWorld, listWorlds, resolveWorldId } from './api.js';
 
 const dom = {
@@ -117,6 +119,13 @@ async function boot() {
   );
 
   const blind = new BlindGame({ stage, mix, monuments, sky, pad, trail });
+  const beat = new Beat(stage.scene, world.mix.beats, world.environment.sky_bottom);
+  const recorder = new Recorder(stage);
+
+  stage.addEventListener('replay', () => {
+    if (recorder.playing) { recorder.stop(); return; }
+    if (recorder.play()) sky.announce('again, the way you walked it', 4);
+  });
   const currentMode = bindModes(() => {});
 
   stage.addEventListener('takeOrPlace', () => {
@@ -136,6 +145,8 @@ async function boot() {
 
   // Land a jump on the pad and the world goes back to how it was found.
   stage.addEventListener('land', () => {
+    // Every landing answers the beat; only a landing on the pad resets.
+    beat.land(mix.songTime(), stage.camera.position);
     if (!pad.contains(stage.camera.position)) return;
     pad.fire();
     interaction.reset();
@@ -202,7 +213,8 @@ async function boot() {
   //   __firstsong.mix.stems.map(s => [s.spec.name, s.level])
   await renderChooser(world.id);
   window.__firstsong = {
-    stage, mix, world, monuments, environment, interaction, trail, pad, sky, blind,
+    stage, mix, world, monuments, environment, interaction, trail, pad, sky,
+    blind, beat, recorder,
   };
 
   let elapsed = 0;
@@ -211,11 +223,17 @@ async function boot() {
     const dt = Math.min(stage.clock.getDelta(), 0.05);
     elapsed += dt;
 
-    stage.step(dt);
+    // While a replay is running it drives the camera and input is ignored.
+    const replaying = recorder.update(dt);
+    if (!replaying) {
+      stage.step(dt);
+      recorder.record(dt, mix.songTime());
+    }
     interaction.update();
     mix.update(stage.camera);
     if (stage.active) trail.update(stage.camera.position);
     blind.update(dt);
+    beat.update(dt);
     pad.update(stage.camera.position, dt, !blind.active && interaction.dirty);
     sky.update(dt);
     // One discovery at a time: while the song is still being assembled, the

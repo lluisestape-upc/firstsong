@@ -262,6 +262,13 @@ export class SpatialMix {
     }
   }
 
+  /** Seconds into the track, wrapped by the loop. Drives the beat mechanic. */
+  songTime() {
+    if (!this.ctx || !this.playing) return 0;
+    const length = this.stems[0]?.buffer.duration || 1;
+    return ((this.ctx.currentTime - this.startedAt) % length + length) % length;
+  }
+
   /** Loudest stem right now, for the HUD. */
   dominant() {
     let best = null;
