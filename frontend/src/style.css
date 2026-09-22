@@ -145,3 +145,51 @@ button:disabled { opacity: 0.45; cursor: progress; }
 /* A stem you are carrying, and one whose monument has been silenced. */
 .stem.held .name { color: var(--ink); font-weight: 600; }
 .stem.held .bar { box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.35); }
+
+/* Song chooser on the entry card. */
+.songs {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 18px;
+}
+.songs button.song {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.songs button.song:hover { background: rgba(242, 240, 234, 0.07); }
+.songs button.song[aria-current="true"] {
+  background: rgba(242, 240, 234, 0.12);
+  border-color: rgba(242, 240, 234, 0.45);
+}
+.songs .song .who {
+  font-style: italic;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Stop / resume, inside the HUD. */
+.pause {
+  width: 100%;
+  margin-top: 11px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+}
+.pause:hover { color: var(--ink); background: rgba(242, 240, 234, 0.07); }

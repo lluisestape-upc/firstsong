@@ -4,7 +4,9 @@ import { buildEnvironment } from './environment.js';
 import { buildMonument } from './monuments.js';
 import { Interaction } from './interaction.js';
 import { Trail } from './trail.js';
-import { cacheUrl, getWorld, resolveWorldId } from './api.js';
+import { Pad } from './pad.js';
+import { SkyText } from './skytext.js';
+import { cacheUrl, getWorld, listWorlds, resolveWorldId } from './api.js';
 
 const dom = {
   overlay: document.getElementById('overlay'),
@@ -12,10 +14,37 @@ const dom = {
   title: document.getElementById('world-title'),
   dedication: document.getElementById('world-dedication'),
   hud: document.getElementById('hud'),
+  songs: document.getElementById('songs'),
+  pause: document.getElementById('pause'),
   readout: document.getElementById('stem-readout'),
   meta: document.getElementById('meta'),
   controls: document.querySelector('.controls'),
 };
+
+/** Offer the other worlds, if there is more than one. Switching reloads. */
+async function renderChooser(currentId) {
+  let worlds = [];
+  try {
+    worlds = await listWorlds();
+  } catch {
+    return;                       // one world only, or no index: no chooser
+  }
+  if (worlds.length < 2) return;
+
+  dom.songs.hidden = false;
+  dom.songs.innerHTML = worlds.map((w) => `
+    <button class="song" data-id="${w.id}" aria-current="${w.id === currentId}">
+      <span>${w.title}</span><span class="who">${w.dedication || ''}</span>
+    </button>`).join('');
+
+  for (const button of dom.songs.querySelectorAll('.song')) {
+    button.addEventListener('click', () => {
+      const id = button.dataset.id;
+      if (id === currentId) return;
+      location.search = `?world=${encodeURIComponent(id)}`;
+    });
+  }
+}
 
 async function boot() {
   const stage = new Stage(document.getElementById('stage'));
@@ -55,13 +84,32 @@ async function boot() {
 
   const interaction = new Interaction(stage, mix, monuments);
   const trail = new Trail(stage.scene, world.environment.sky_bottom);
-  stage.addEventListener('takeOrPlace', () => interaction.takeOrPlace());
+  const pad = new Pad(stage.scene, world.environment.sky_bottom);
+  const sky = new SkyText(
+    stage.scene, stage.camera, world.dedication, 'some of this can be carried'
+  );
+
+  stage.addEventListener('takeOrPlace', () => {
+    const acted = interaction.takeOrPlace();
+    if (acted) sky.dismiss();      // they worked it out; the hint is done
+  });
   stage.addEventListener('hushOrWake', () => interaction.hushOrWake());
+  stage.addEventListener('soloStart', () => interaction.startSolo());
+  stage.addEventListener('soloEnd', () => interaction.endSolo());
+
+  // Land a jump on the pad and the world goes back to how it was found.
+  stage.addEventListener('land', () => {
+    if (!pad.contains(stage.camera.position)) return;
+    pad.fire();
+    interaction.reset();
+    trail.clear();
+  });
 
   dom.enter.disabled = false;
   dom.enter.textContent = 'Step inside';
-  dom.enter.addEventListener('click', () => {
-    mix.start();
+  dom.enter.addEventListener('click', async () => {
+    if (mix.playing) { await mix.resume(); } else { mix.start(); }
+    setPauseLabel();
     stage.enter();
   });
 
@@ -77,7 +125,19 @@ async function boot() {
         : 'W A S D to walk · mouse to look · E take · Q hush · Esc to let go';
     }, 120);
   });
-  stage.addEventListener('exit', () => {
+  const setPauseLabel = () => {
+    dom.pause.textContent = mix.paused ? 'Play the song' : 'Stop the song';
+  };
+  dom.pause.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    await mix.togglePause();
+    setPauseLabel();
+  });
+
+  stage.addEventListener('exit', async () => {
+    // Letting go stops the song too: nobody wants it playing at a menu.
+    await mix.pause();
+    setPauseLabel();
     dom.overlay.classList.remove('hidden');
     dom.hud.classList.add('hidden');
     dom.enter.textContent = 'Back inside';
@@ -85,7 +145,10 @@ async function boot() {
 
   // Handy from the devtools console while tuning the mapping:
   //   __firstsong.mix.stems.map(s => [s.spec.name, s.level])
-  window.__firstsong = { stage, mix, world, monuments, environment, interaction, trail };
+  await renderChooser(world.id);
+  window.__firstsong = {
+    stage, mix, world, monuments, environment, interaction, trail, pad, sky,
+  };
 
   let elapsed = 0;
   function frame() {
@@ -97,6 +160,11 @@ async function boot() {
     interaction.update();
     mix.update(stage.camera);
     if (stage.active) trail.update(stage.camera.position);
+    pad.update(stage.camera.position, dt, interaction.dirty);
+    sky.update(dt);
+    // The hint only appears when you are next to something and have not yet
+    // discovered that you can pick it up.
+    sky.showHint(Boolean(interaction.focus));
 
     for (const monument of monuments) {
       const stem = byName.get(monument.spec.name);

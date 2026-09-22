@@ -28,7 +28,23 @@ export class Interaction {
     this.byName = new Map(mix.stems.map((s) => [s.spec.name, s]));
     this.carrying = null;
     this.focus = null;
+    this.soloing = null;
+    // The arrangement the world was built with, so it can always be restored.
+    this.original = monuments.map((m) => ({
+      name: m.spec.name, position: [...m.spec.position],
+    }));
     this.onChange = () => {};
+  }
+
+  /** True once anything has been moved or hushed: what the pad can undo. */
+  get dirty() {
+    if (this.carrying) return true;
+    return this.monuments.some((m, i) => {
+      if (m.hushed) return true;
+      const from = this.original[i].position;
+      const p = m.spec.position;
+      return Math.hypot(p[0] - from[0], p[2] - from[2]) > 0.25;
+    });
   }
 
   stemFor(monument) {
@@ -96,6 +112,45 @@ export class Interaction {
     target.hushed = this.mix.toggleStemMuted(stem);
     this.onChange(target.hushed ? 'hush' : 'wake', target);
     return target;
+  }
+
+  /** Mechanic 4. Hold to hear one monument on its own. */
+  startSolo() {
+    const target = this.carrying || this.nearest();
+    if (!target) return null;
+    this.soloing = target;
+    this.mix.soloStem(this.stemFor(target));
+    this.onChange('solo', target);
+    return target;
+  }
+
+  endSolo() {
+    if (!this.soloing) return;
+    const was = this.soloing;
+    this.soloing = null;
+    this.mix.soloStem(null);
+    this.onChange('unsolo', was);
+  }
+
+  /** Mechanic 5. Put the world back the way it was found. */
+  reset() {
+    if (this.carrying) {
+      this.carrying.carried = false;
+      this.carrying = null;
+    }
+    this.endSolo();
+
+    for (const monument of this.monuments) {
+      const from = this.original.find((o) => o.name === monument.spec.name);
+      if (!from) continue;
+      const [x, y, z] = from.position;
+      monument.setPosition(x, y, z);
+      monument.spec.position = [x, y, z];
+      monument.hushed = false;
+      this.mix.setStemMuted(this.stemFor(monument), false);
+    }
+    this.mix.resetPositions(this.original);
+    this.onChange('reset', null);
   }
 
   /** Call once per frame, after the camera has moved. */

@@ -12,6 +12,8 @@ const WALK_SPEED = 9.0;
 const DAMPING = 8.0;
 const EYE_HEIGHT = 1.7;
 const WORLD_LIMIT = 70;
+const JUMP_SPEED = 5.2;
+const GRAVITY = 14.0;
 const LOOK_SENSITIVITY = 0.0023;
 const PITCH_LIMIT = Math.PI / 2 - 0.05;
 
@@ -45,6 +47,9 @@ export class Stage extends EventTarget {
     this.active = false;
     this.dragging = false;
     this.captured = false;
+    this.hop = 0;            // metres above eye height
+    this.hopVelocity = 0;
+    this.airborne = false;
 
     this._bindInput();
     window.addEventListener('resize', () => this.resize());
@@ -60,8 +65,13 @@ export class Stage extends EventTarget {
       if (event.code === 'Escape' && !this.captured) this.exit();
       if (event.code === 'KeyE') this.dispatchEvent(new Event('takeOrPlace'));
       if (event.code === 'KeyQ') this.dispatchEvent(new Event('hushOrWake'));
+      if (event.code === 'KeyF') this.dispatchEvent(new Event('soloStart'));
+      if (event.code === 'Space') this.jump();
     });
-    document.addEventListener('keyup', (event) => this.keys.delete(event.code));
+    document.addEventListener('keyup', (event) => {
+      this.keys.delete(event.code);
+      if (event.code === 'KeyF') this.dispatchEvent(new Event('soloEnd'));
+    });
 
     document.addEventListener('pointerlockchange', () => {
       this.captured = document.pointerLockElement === canvas;
@@ -107,6 +117,12 @@ export class Stage extends EventTarget {
       this.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.pitch));
       lastTouch = touch;
     }, { passive: true });
+  }
+
+  jump() {
+    if (!this.active || this.airborne) return;
+    this.hopVelocity = JUMP_SPEED;
+    this.airborne = true;
   }
 
   /** Enter the world. Pointer lock if the browser allows it, drag-look if not. */
@@ -165,8 +181,20 @@ export class Stage extends EventTarget {
     this.velocity.lerp(this.move, blend);
     this.camera.position.addScaledVector(this.velocity, dt);
 
+    // Vertical: a hop, so there is a gesture available that is not walking.
+    if (this.airborne) {
+      this.hopVelocity -= GRAVITY * dt;
+      this.hop += this.hopVelocity * dt;
+      if (this.hop <= 0) {
+        this.hop = 0;
+        this.hopVelocity = 0;
+        this.airborne = false;
+        this.dispatchEvent(new Event('land'));
+      }
+    }
+
     const p = this.camera.position;
-    p.y = EYE_HEIGHT;
+    p.y = EYE_HEIGHT + this.hop;
     const distance = Math.hypot(p.x, p.z);
     if (distance > WORLD_LIMIT) {
       p.x *= WORLD_LIMIT / distance;

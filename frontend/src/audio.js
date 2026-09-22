@@ -61,6 +61,8 @@ export class SpatialMix {
     this.playing = false;
     this.startedAt = 0;
     this.rolloff = rolloff;
+    this.soloed = null;
+    this.paused = false;
   }
 
   /** Move a stem's source. This is what makes carrying a monument audible. */
@@ -80,6 +82,36 @@ export class SpatialMix {
     gain.setValueAtTime(gain.value, now);
     gain.linearRampToValueAtTime(muted ? 0.0001 : 1.0, now + seconds);
     stem.muted = muted;
+  }
+
+  /**
+   * Hold one stem up and duck the rest. This is the piece's whole lesson in
+   * three seconds: a song you know, with only the bass left in it.
+   * Passing null releases the solo and restores whatever was muted before.
+   */
+  soloStem(stem, seconds = 0.14) {
+    if (!this.ctx) return;
+    this.soloed = stem || null;
+    for (const other of this.stems) {
+      const target = stem
+        ? (other === stem ? 1.0 : 0.0001)
+        : (other.muted ? 0.0001 : 1.0);
+      const gain = other.gain.gain;
+      const now = this.ctx.currentTime;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      gain.linearRampToValueAtTime(target, now + seconds);
+    }
+  }
+
+  /** Put every source back where the manifest first placed it. */
+  resetPositions(specs) {
+    for (const stem of this.stems) {
+      const spec = specs.find((s) => s.name === stem.spec.name);
+      if (!spec) continue;
+      writePannerPosition(stem.panner, ...spec.position);
+      stem.spec.position = [...spec.position];
+    }
   }
 
   toggleStemMuted(stem) {
@@ -180,6 +212,30 @@ export class SpatialMix {
   stop() {
     for (const stem of this.stems) stem.source?.stop();
     this.playing = false;
+  }
+
+  /**
+   * Suspending the context holds every source at the same sample, so the four
+   * stems stay locked to each other across a pause. Stopping and restarting
+   * them would drift them apart.
+   */
+  async pause() {
+    if (!this.ctx || this.ctx.state !== 'running') return false;
+    await this.ctx.suspend();
+    this.paused = true;
+    return true;
+  }
+
+  async resume() {
+    if (!this.ctx || this.ctx.state === 'closed') return false;
+    await this.ctx.resume();
+    this.paused = false;
+    return true;
+  }
+
+  async togglePause() {
+    if (this.paused) { await this.resume(); } else { await this.pause(); }
+    return this.paused;
   }
 
   /** Call once per frame with the camera. */
