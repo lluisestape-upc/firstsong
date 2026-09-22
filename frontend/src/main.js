@@ -35,7 +35,7 @@ async function boot() {
     `${world.mix.tempo} BPM · key ${world.mix.key} · ${world.stems.length} stems · ` +
     `${world.environment.provider}`;
 
-  buildEnvironment(stage.scene, world.environment);
+  const environment = await buildEnvironment(stage.scene, world.environment, base);
 
   const monuments = await Promise.all(
     world.stems.map((spec) => buildMonument(spec, base))
@@ -78,7 +78,7 @@ async function boot() {
 
   // Handy from the devtools console while tuning the mapping:
   //   __firstsong.mix.stems.map(s => [s.spec.name, s.level])
-  window.__firstsong = { stage, mix, world, monuments };
+  window.__firstsong = { stage, mix, world, monuments, environment };
 
   let elapsed = 0;
   function frame() {

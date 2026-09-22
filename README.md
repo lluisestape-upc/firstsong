@@ -146,13 +146,32 @@ touching Python.
 
 ### World Labs
 
-`worldlabs.py` has two providers behind one interface. `procedural` derives a
-sky, fog and ground palette from the song's key and tempo and always works.
-`worldlabs` is wired but deliberately not hardcoded to a guessed request shape:
-set `WORLDLABS_ENDPOINT`, adapt `_worldlabs()` to the response you actually get,
-then teach `frontend/src/environment.js` to load the asset. `world.json` always
-records which provider produced the environment, so the Tool Track claim on the
-submission stays truthful either way.
+Integrated through Marble's **documented export formats**, not through a guessed
+API shape, so it works from the web app alone:
+
+```bash
+# generate the world in the Marble web app, download the exports, then
+python scripts/attach_environment.py my-way --from "C:\Downloads\marble-export"
+python scripts/attach_environment.py my-way --detach        # back to procedural
+```
+
+The **equirectangular panorama** (2560x1280 png) becomes the sky and lights the
+scene through `scene.environment`; the **collider mesh** (glb, 100-200k tris)
+becomes the landscape. Not the high-quality mesh: that one is 600k-1M triangles,
+takes an hour and is rate limited to 4/hour. Not splats either (SPZ/PLY, 2M
+splats) since they need a renderer this project does not ship.
+
+Marble exports in **OpenCV coordinates** (+y down, +z forward) while three.js is
+OpenGL, so meshes are flipped on Y and Z by `openCVToOpenGL()` in
+`environment.js`. Skip that and the landscape arrives upside down.
+
+Both paths fall back to the procedural sky and disc if an asset fails to load,
+and `world.json` always records which provider produced the environment, so the
+Tool Track claim on the submission stays truthful either way.
+
+`assets/fixtures/` holds a synthetic panorama and two small glbs (plus the
+script that generates them) so the loader can be exercised without burning
+credits.
 
 ---
 
