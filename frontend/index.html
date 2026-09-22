@@ -19,6 +19,20 @@
           Walk towards a shape and you turn that stem up.
           Some of them can be picked up and left somewhere else.
         </p>
+        <div id="modes" class="modes">
+          <button class="mode" data-mode="gather" aria-current="true">
+            <span class="what">Gather</span>
+            <span class="why">the song is asleep. walk and it wakes.</span>
+          </button>
+          <button class="mode" data-mode="wander">
+            <span class="what">Wander</span>
+            <span class="why">all of it, playing already. go anywhere.</span>
+          </button>
+          <button class="mode" data-mode="blind">
+            <span class="what">Blind</span>
+            <span class="why">one sound, somewhere. find it by ear.</span>
+          </button>
+        </div>
         <div id="songs" class="songs" hidden></div>
         <button id="enter" disabled>Loading the world…</button>
         <p class="controls">W A S D walk &middot; mouse look &middot; E take &middot; Q hush &middot; F listen alone &middot; Space jump &middot; Esc let go</p>

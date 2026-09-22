@@ -6,6 +6,7 @@ import { Interaction } from './interaction.js';
 import { Trail } from './trail.js';
 import { Pad } from './pad.js';
 import { SkyText } from './skytext.js';
+import { BlindGame } from './blind.js';
 import { cacheUrl, getWorld, listWorlds, resolveWorldId } from './api.js';
 
 const dom = {
@@ -15,6 +16,7 @@ const dom = {
   dedication: document.getElementById('world-dedication'),
   hud: document.getElementById('hud'),
   songs: document.getElementById('songs'),
+  modes: document.getElementById('modes'),
   pause: document.getElementById('pause'),
   readout: document.getElementById('stem-readout'),
   meta: document.getElementById('meta'),
@@ -44,6 +46,31 @@ async function renderChooser(currentId) {
       location.search = `?world=${encodeURIComponent(id)}`;
     });
   }
+}
+
+const MODES = ['gather', 'wander', 'blind'];
+
+function readMode() {
+  const asked = new URLSearchParams(location.search).get('mode');
+  return MODES.includes(asked) ? asked : 'gather';
+}
+
+function bindModes(onPick) {
+  let current = readMode();
+  const paint = () => {
+    for (const button of dom.modes.querySelectorAll('.mode')) {
+      button.setAttribute('aria-current', String(button.dataset.mode === current));
+    }
+  };
+  for (const button of dom.modes.querySelectorAll('.mode')) {
+    button.addEventListener('click', () => {
+      current = button.dataset.mode;
+      paint();
+      onPick(current);
+    });
+  }
+  paint();
+  return () => current;
 }
 
 async function boot() {
@@ -89,7 +116,12 @@ async function boot() {
     stage.scene, stage.camera, world.dedication, 'some of this can be carried'
   );
 
+  const blind = new BlindGame({ stage, mix, monuments, sky, pad, trail });
+  const currentMode = bindModes(() => {});
+
   stage.addEventListener('takeOrPlace', () => {
+    // In Blind the same key commits to a spot instead of picking things up.
+    if (blind.active) { blind.guess(); return; }
     const acted = interaction.takeOrPlace();
     if (acted) sky.dismiss();      // they worked it out; the hint is done
   });
@@ -114,12 +146,23 @@ async function boot() {
   dom.enter.textContent = 'Step inside';
   let started = false;
   dom.enter.addEventListener('click', async () => {
+    const mode = currentMode();
     if (mix.playing) {
       await mix.resume();
     } else {
       mix.start();
-      // Only on the very first entry: coming back should not undo the song.
-      if (!started) { interaction.beginAsleep(); started = true; }
+      started = true;
+    }
+    // Picking a mode from the card always (re)starts that mode, so a judge can
+    // try all three without reloading.
+    if (mode === 'blind') {
+      blind.start();
+    } else {
+      if (blind.active) blind.active = false;
+      if (mode === 'gather' && !interaction.everGathered) {
+        interaction.beginAsleep();
+        interaction.everGathered = true;
+      }
     }
     setPauseLabel();
     stage.enter();
@@ -159,7 +202,7 @@ async function boot() {
   //   __firstsong.mix.stems.map(s => [s.spec.name, s.level])
   await renderChooser(world.id);
   window.__firstsong = {
-    stage, mix, world, monuments, environment, interaction, trail, pad, sky,
+    stage, mix, world, monuments, environment, interaction, trail, pad, sky, blind,
   };
 
   let elapsed = 0;
@@ -172,11 +215,12 @@ async function boot() {
     interaction.update();
     mix.update(stage.camera);
     if (stage.active) trail.update(stage.camera.position);
-    pad.update(stage.camera.position, dt, interaction.dirty);
+    blind.update(dt);
+    pad.update(stage.camera.position, dt, !blind.active && interaction.dirty);
     sky.update(dt);
     // One discovery at a time: while the song is still being assembled, the
     // sky says nothing about carrying.
-    sky.showHint(interaction.assembled && Boolean(interaction.focus));
+    sky.showHint(!blind.active && interaction.assembled && Boolean(interaction.focus));
 
     for (const monument of monuments) {
       const stem = byName.get(monument.spec.name);

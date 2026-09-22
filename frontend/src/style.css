@@ -193,3 +193,36 @@ button:disabled { opacity: 0.45; cursor: progress; }
   border-radius: 7px;
 }
 .pause:hover { color: var(--ink); background: rgba(242, 240, 234, 0.07); }
+
+/* Mode picker on the entry card. */
+.modes {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 14px;
+}
+.modes button.mode {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.modes button.mode:hover { background: rgba(242, 240, 234, 0.07); }
+.modes button.mode[aria-current="true"] {
+  background: rgba(242, 240, 234, 0.12);
+  border-color: rgba(242, 240, 234, 0.45);
+}
+.modes .what { display: block; font-size: 14px; font-weight: 600; }
+.modes .why {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted);
+}
