@@ -1,12 +1,23 @@
 /**
  * A line written in the sky.
  *
- * The dedication belongs in the world, not in a dialog: once you are inside,
- * the piece should not have any interface left. A second, fainter line carries
- * the one thing the world cannot teach by itself, and it is gone for good the
- * moment you work it out.
+ * It carries the one sentence the world cannot teach by itself: what you are
+ * meant to do in the mode you picked. It belongs in the sky rather than in a
+ * dialog, because once you are inside the piece should have no interface left.
+ * It fades once you have clearly understood it.
  */
 import * as THREE from 'three';
+
+// Ahead of the player rather than nailed to a point in the world: pinned to
+// the sky over the origin it sat at about sixty degrees up, which means
+// craning your neck to read it. Hung ahead at this distance and height it
+// comes in at roughly twenty degrees, a glance rather than a stretch.
+const AHEAD = 26;
+const INSTRUCTION_HEIGHT = 9.5;
+const ANNOUNCE_HEIGHT = 6.5;
+
+const _ahead = new THREE.Vector3();
+const _vec = new THREE.Vector3();
 
 function textPlane(text, { size = 88, width = 2048, opacity = 0.5, italic = false }) {
   const canvas = document.createElement('canvas');
@@ -39,27 +50,33 @@ function textPlane(text, { size = 88, width = 2048, opacity = 0.5, italic = fals
 }
 
 export class SkyText {
-  /** Writes `dedication` permanently, and `hint` until dismiss() is called. */
-  constructor(scene, camera, dedication, hint) {
+  constructor(scene, camera) {
     this.camera = camera;
+    this.scene = scene;
     this.group = new THREE.Group();
-
-    this.dedication = textPlane(dedication, { size: 84, opacity: 0.0, italic: true });
-    this.dedication.position.set(0, 26, 0);
-    this.group.add(this.dedication);
-
-    this.hint = hint ? textPlane(hint, { size: 54, opacity: 0.0 }) : null;
-    if (this.hint) {
-      this.hint.scale.setScalar(0.62);
-      this.hint.position.set(0, 20, 0);
-      this.group.add(this.hint);
-    }
-
-    this.dedicationTarget = 0.5;
-    this.hintTarget = 0;
-    this.dismissed = false;
+    this.instruction = null;
+    this.instructionUntil = 0;
+    this.announcement = null;
     this.elapsed = 0;
     scene.add(this.group);
+  }
+
+  /**
+   * The line for the mode just entered. Held for a while, then faded: long
+   * enough to read twice, short enough that the sky is empty by the time you
+   * are actually playing.
+   */
+  say(text, seconds = 14) {
+    if (this.instruction) this.group.remove(this.instruction);
+    this.instruction = textPlane(text, { size: 74, opacity: 0, italic: true });
+    this.instruction.position.copy(this.camera.position);
+    this.group.add(this.instruction);
+    this.instructionUntil = this.elapsed + seconds;
+  }
+
+  /** Cut it short: the player has clearly understood. */
+  dismiss() {
+    this.instructionUntil = Math.min(this.instructionUntil, this.elapsed + 1.2);
   }
 
   /**
@@ -70,60 +87,52 @@ export class SkyText {
     if (this.announcement) this.group.remove(this.announcement);
     this.announcement = textPlane(text, { size: 58, opacity: 0, italic: true });
     this.announcement.scale.setScalar(0.7);
-    this.announcement.position.set(0, 20, 0);
+    this.announcement.position.copy(this.camera.position);
     this.group.add(this.announcement);
     this.announceUntil = this.elapsed + seconds;
-  }
-
-  /** Show the hint. Ignored once the player has proved they do not need it. */
-  showHint(show = true) {
-    if (this.dismissed) return;
-    this.hintTarget = show ? 0.42 : 0;
-  }
-
-  /** The player took something: the hint has done its job, permanently. */
-  dismiss() {
-    this.dismissed = true;
-    this.hintTarget = 0;
   }
 
   update(dt) {
     this.elapsed += dt;
 
-    // Both lines sit in the sky ahead of wherever you are looking, always
-    // legible, never in the way.
-    const yaw = Math.atan2(
-      this.camera.position.x - this.group.position.x || 0, 1
-    );
-    this.group.rotation.y = yaw;
-    for (const mesh of [this.dedication, this.hint]) {
-      if (!mesh) continue;
-      mesh.lookAt(this.camera.position.x, mesh.position.y - 6, this.camera.position.z);
-    }
-
-    // Fade in slowly, and breathe, so the sky does not read as a UI layer.
     const breath = 0.86 + Math.sin(this.elapsed * 0.35) * 0.14;
-    const ease = Math.min(1, dt * 1.2);
-    const d = this.dedication.material;
-    d.opacity += (this.dedicationTarget * breath - d.opacity) * ease;
+
+    // Where a line should hang right now: ahead of where you are facing.
+    this.camera.getWorldDirection(_ahead);
+    _ahead.y = 0;
+    if (_ahead.lengthSq() < 1e-6) _ahead.set(0, 0, -1);
+    _ahead.normalize().multiplyScalar(AHEAD).add(this.camera.position);
+
+    const hang = (mesh, height) => {
+      // Ease across so turning around does not teleport the words.
+      mesh.position.lerp(
+        _vec.set(_ahead.x, this.camera.position.y + height, _ahead.z),
+        Math.min(1, dt * 1.1)
+      );
+      mesh.lookAt(this.camera.position.x, mesh.position.y, this.camera.position.z);
+    };
+
+    if (this.instruction) {
+      const m = this.instruction.material;
+      const target = this.elapsed < this.instructionUntil ? 0.52 : 0;
+      m.opacity += (target * breath - m.opacity) * Math.min(1, dt * 1.4);
+      hang(this.instruction, INSTRUCTION_HEIGHT);
+      if (m.opacity < 0.01 && target === 0) {
+        this.group.remove(this.instruction);
+        this.instruction = null;
+      }
+    }
 
     if (this.announcement) {
       const a = this.announcement.material;
       const target = this.elapsed < this.announceUntil ? 0.5 : 0;
       a.opacity += (target * breath - a.opacity) * Math.min(1, dt * 1.6);
-      this.announcement.lookAt(
-        this.camera.position.x, this.announcement.position.y - 6, this.camera.position.z
-      );
+      hang(this.announcement, ANNOUNCE_HEIGHT);
       if (a.opacity < 0.01 && target === 0) {
         this.group.remove(this.announcement);
         this.announcement = null;
       }
     }
 
-    if (this.hint) {
-      const h = this.hint.material;
-      h.opacity += (this.hintTarget * breath - h.opacity) * Math.min(1, dt * 2.5);
-      this.hint.visible = h.opacity > 0.01;
-    }
   }
 }

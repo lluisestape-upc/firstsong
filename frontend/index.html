@@ -11,31 +11,75 @@
 
     <div id="overlay" class="overlay">
       <div class="card">
-        <p class="kicker">A world as a gift</p>
-        <h1 id="world-title">First Song</h1>
-        <p id="world-dedication" class="dedication">for the kid I used to be</p>
-        <p class="hint">
-          Headphones. The song is not playing at you, it is standing around you.
-          Walk towards a shape and you turn that stem up.
-          Some of them can be picked up and left somewhere else.
-        </p>
-        <div id="modes" class="modes">
-          <button class="mode" data-mode="gather" aria-current="true">
+        <header class="masthead">
+          <p class="kicker">A world as a gift</p>
+          <h1 id="world-title">First Song</h1>
+        </header>
+
+        <nav id="songs" class="songs" aria-label="Song"></nav>
+
+        <div id="modes" class="modes" role="radiogroup" aria-label="Mode">
+          <button class="mode" data-mode="gather" role="radio" aria-checked="true" aria-label="Gather">
+            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
+              <g class="dots">
+                <circle cx="24" cy="26" r="6" class="off" style="--i:0"/>
+                <circle cx="58" cy="16" r="6" class="off" style="--i:1"/>
+                <circle cx="96" cy="30" r="6" class="off" style="--i:2"/>
+                <circle cx="80" cy="58" r="6" class="off" style="--i:3"/>
+                <circle cx="38" cy="58" r="7" class="on"/>
+              </g>
+              <path class="walk" d="M38 58 L24 26" />
+            </svg>
+            <img class="shot" src="modes/gather.webp" alt=""
+                 onerror="this.remove()">
             <span class="what">Gather</span>
-            <span class="why">the song is asleep. walk and it wakes.</span>
           </button>
-          <button class="mode" data-mode="wander">
+
+          <button class="mode" data-mode="wander" role="radio" aria-checked="false" aria-label="Wander">
+            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
+              <g class="dots">
+                <circle cx="22" cy="24" r="6" class="on"/>
+                <circle cx="58" cy="15" r="6" class="on"/>
+                <circle cx="98" cy="28" r="6" class="on"/>
+                <circle cx="82" cy="60" r="6" class="on"/>
+                <circle cx="34" cy="56" r="6" class="on"/>
+              </g>
+              <path id="wanderPath" class="route"
+                    d="M14 66 C 36 40, 30 20, 56 30 S 92 58, 110 34" />
+              <circle r="3.5" class="walker">
+                <animateMotion dur="7s" repeatCount="indefinite" rotate="auto">
+                  <mpath href="#wanderPath"/>
+                </animateMotion>
+              </circle>
+            </svg>
+            <img class="shot" src="modes/wander.webp" alt=""
+                 onerror="this.remove()">
             <span class="what">Wander</span>
-            <span class="why">all of it, playing already. go anywhere.</span>
           </button>
-          <button class="mode" data-mode="blind">
+
+          <button class="mode" data-mode="blind" role="radio" aria-checked="false" aria-label="Blind">
+            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
+              <g class="dots">
+                <circle cx="26" cy="22" r="6" class="hidden-dot"/>
+                <circle cx="62" cy="14" r="6" class="hidden-dot"/>
+                <circle cx="96" cy="52" r="6" class="hidden-dot"/>
+                <circle cx="34" cy="58" r="6" class="hidden-dot"/>
+              </g>
+              <g class="sonar">
+                <circle cx="74" cy="38" r="7" class="on"/>
+                <circle cx="74" cy="38" r="7" class="ping" style="--d:0s"/>
+                <circle cx="74" cy="38" r="7" class="ping" style="--d:1s"/>
+                <circle cx="74" cy="38" r="7" class="ping" style="--d:2s"/>
+              </g>
+            </svg>
+            <img class="shot" src="modes/blind.webp" alt=""
+                 onerror="this.remove()">
             <span class="what">Blind</span>
-            <span class="why">one sound, somewhere. find it by ear.</span>
           </button>
         </div>
-        <div id="songs" class="songs" hidden></div>
-        <button id="enter" disabled>Loading the world…</button>
-        <p class="controls">W A S D walk &middot; mouse look &middot; E take &middot; Q hush &middot; F listen alone &middot; Space jump &middot; R replay your walk &middot; Esc let go</p>
+
+        <button id="enter" disabled>Loading…</button>
+        <p class="controls">W A S D walk &middot; mouse look &middot; E take &middot; Q hush &middot; F listen alone &middot; Space jump &middot; R replay &middot; Esc let go</p>
       </div>
     </div>
 

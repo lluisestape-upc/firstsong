@@ -15,7 +15,6 @@ const dom = {
   overlay: document.getElementById('overlay'),
   enter: document.getElementById('enter'),
   title: document.getElementById('world-title'),
-  dedication: document.getElementById('world-dedication'),
   hud: document.getElementById('hud'),
   songs: document.getElementById('songs'),
   modes: document.getElementById('modes'),
@@ -37,9 +36,8 @@ async function renderChooser(currentId) {
 
   dom.songs.hidden = false;
   dom.songs.innerHTML = worlds.map((w) => `
-    <button class="song" data-id="${w.id}" aria-current="${w.id === currentId}">
-      <span>${w.title}</span><span class="who">${w.dedication || ''}</span>
-    </button>`).join('');
+    <button class="song" data-id="${w.id}" aria-current="${w.id === currentId}"
+            type="button">${w.title}</button>`).join('');
 
   for (const button of dom.songs.querySelectorAll('.song')) {
     button.addEventListener('click', () => {
@@ -52,6 +50,14 @@ async function renderChooser(currentId) {
 
 const MODES = ['gather', 'wander', 'blind'];
 
+// The one sentence each mode needs. It goes in the sky, not on the menu: the
+// menu shows what a mode looks like, the world says what to do in it.
+const INSTRUCTION = {
+  gather: 'walk up to a shape to wake it',
+  wander: 'where you stand is the mix',
+  blind: 'find the sound, then press E',
+};
+
 function readMode() {
   const asked = new URLSearchParams(location.search).get('mode');
   return MODES.includes(asked) ? asked : 'gather';
@@ -61,7 +67,7 @@ function bindModes(onPick) {
   let current = readMode();
   const paint = () => {
     for (const button of dom.modes.querySelectorAll('.mode')) {
-      button.setAttribute('aria-current', String(button.dataset.mode === current));
+      button.setAttribute('aria-checked', String(button.dataset.mode === current));
     }
   };
   for (const button of dom.modes.querySelectorAll('.mode')) {
@@ -83,14 +89,13 @@ async function boot() {
     world = await getWorld(await resolveWorldId());
   } catch (error) {
     dom.enter.textContent = 'No world found';
-    dom.dedication.textContent = String(error.message);
+    dom.title.textContent = String(error.message);
     console.error(error);
     return;
   }
 
   const base = cacheUrl(world.id);
   dom.title.textContent = world.title;
-  dom.dedication.textContent = world.dedication;
   dom.meta.textContent =
     `${world.mix.tempo} BPM · key ${world.mix.key} · ${world.stems.length} stems · ` +
     `${world.environment.provider}`;
@@ -114,9 +119,7 @@ async function boot() {
   const interaction = new Interaction(stage, mix, monuments);
   const trail = new Trail(stage.scene, world.environment.sky_bottom);
   const pad = new Pad(stage.scene, world.environment.sky_bottom);
-  const sky = new SkyText(
-    stage.scene, stage.camera, world.dedication, 'some of this can be carried'
-  );
+  const sky = new SkyText(stage.scene, stage.camera);
 
   const blind = new BlindGame({ stage, mix, monuments, sky, pad, trail });
   const beat = new Beat(stage.scene, world.mix.beats, world.environment.sky_bottom);
@@ -131,12 +134,13 @@ async function boot() {
   stage.addEventListener('takeOrPlace', () => {
     // In Blind the same key commits to a spot instead of picking things up.
     if (blind.active) { blind.guess(); return; }
-    const acted = interaction.takeOrPlace();
-    if (acted) sky.dismiss();      // they worked it out; the hint is done
+    if (interaction.takeOrPlace()) sky.dismiss();
   });
 
   // The sky acknowledges the song coming back together, then gets out of the way.
   interaction.onChange = (what) => {
+    // Waking the first one proves the instruction landed.
+    if (what === 'discovered') sky.dismiss();
     if (what === 'assembled') sky.announce('all of it, together');
   };
   stage.addEventListener('hushOrWake', () => interaction.hushOrWake());
@@ -166,6 +170,7 @@ async function boot() {
     }
     // Picking a mode from the card always (re)starts that mode, so a judge can
     // try all three without reloading.
+    sky.say(INSTRUCTION[mode]);
     if (mode === 'blind') {
       blind.start();
     } else {
@@ -238,7 +243,6 @@ async function boot() {
     sky.update(dt);
     // One discovery at a time: while the song is still being assembled, the
     // sky says nothing about carrying.
-    sky.showHint(!blind.active && interaction.assembled && Boolean(interaction.focus));
 
     for (const monument of monuments) {
       const stem = byName.get(monument.spec.name);

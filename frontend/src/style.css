@@ -1,8 +1,10 @@
 :root {
   --ink: #f2f0ea;
   --muted: #a9a49a;
-  --panel: rgba(12, 12, 16, 0.72);
-  --edge: rgba(242, 240, 234, 0.16);
+  --faint: #6f6b63;
+  --panel: rgba(12, 12, 16, 0.78);
+  --edge: rgba(242, 240, 234, 0.14);
+  --edge-strong: rgba(242, 240, 234, 0.5);
 }
 
 * { box-sizing: border-box; }
@@ -18,75 +20,219 @@ html, body {
 
 #stage { display: block; width: 100vw; height: 100vh; }
 
+/* ---------------------------------------------------------------- overlay */
+
 .overlay {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 16px;
-  background: radial-gradient(120% 90% at 50% 0%, rgba(0,0,0,0.35), rgba(0,0,0,0.85));
+  padding: 20px;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(0,0,0,0.3), rgba(0,0,0,0.88));
   backdrop-filter: blur(3px);
   transition: opacity 0.4s ease;
 }
 .overlay.hidden { opacity: 0; pointer-events: none; }
 
+/* A wide card, and one that can never push its own button off screen:
+   the middle scrolls, the masthead and the button stay put. */
 .card {
-  width: min(520px, 100%);
-  padding: 32px;
-  border: 1px solid var(--edge);
-  border-radius: 14px;
-  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(880px, 100%);
+  max-height: calc(100dvh - 40px);
+  padding: clamp(20px, 3vw, 34px);
   text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 16px;
 }
 
+.masthead { flex: none; }
+
 .kicker {
-  margin: 0 0 6px;
-  font-size: 12px;
-  letter-spacing: 0.22em;
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.26em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--faint);
 }
 
 h1 {
-  margin: 0 0 6px;
-  font-size: clamp(28px, 6vw, 42px);
+  margin: 0;
+  font-size: clamp(30px, 5vw, 46px);
   font-weight: 600;
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
-.dedication {
-  margin: 0 0 22px;
-  font-style: italic;
+/* ------------------------------------------------------------------ songs */
+
+.songs {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.songs:empty { display: none; }
+
+.songs button {
+  padding: 7px 16px;
+  font: inherit;
+  font-size: 13px;
   color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+.songs button:hover { color: var(--ink); background: rgba(242, 240, 234, 0.06); }
+.songs button[aria-current="true"] {
+  color: var(--ink);
+  border-color: var(--edge-strong);
+  background: rgba(242, 240, 234, 0.1);
 }
 
-.hint {
-  margin: 0 0 24px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--muted);
+/* ------------------------------------------------------------------ modes */
+
+.modes {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
-button {
+.mode {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.mode:hover { background: rgba(242, 240, 234, 0.06); transform: translateY(-2px); }
+.mode[aria-checked="true"] {
+  border-color: var(--edge-strong);
+  background: rgba(242, 240, 234, 0.1);
+}
+
+.mode { position: relative; }
+
+/* Drop modes/<name>.webp in and it covers the svg. Missing files remove
+   themselves, so the generated tiles are the fallback, not a placeholder. */
+.mode .shot {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: calc(100% - 28px);
+  aspect-ratio: 120 / 76;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.mode .what {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* The tile says what the mode is without a sentence. */
+.thumb {
   width: 100%;
-  padding: 13px 20px;
+  height: auto;
+  aspect-ratio: 120 / 76;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.thumb .on { fill: var(--ink); opacity: 0.9; }
+.thumb .off {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.2;
+  opacity: 0.22;
+}
+.thumb .hidden-dot { fill: var(--ink); opacity: 0.05; }
+.thumb .walk {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 4;
+  opacity: 0.45;
+}
+.thumb .route {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.3;
+  opacity: 0.3;
+}
+.thumb .walker { fill: var(--ink); opacity: 0.95; }
+.thumb .ping {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.4;
+  transform-origin: 74px 38px;
+  animation: ping 3s linear infinite;
+  animation-delay: var(--d);
+}
+
+/* Gather: the dim ones light up one after another, which is the whole idea. */
+.mode[data-mode="gather"] .thumb .off {
+  animation: wake 4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.5s);
+}
+
+@keyframes wake {
+  0%, 55%  { opacity: 0.22; fill: none; }
+  70%, 88% { opacity: 0.9;  fill: var(--ink); }
+  100%     { opacity: 0.22; fill: none; }
+}
+@keyframes ping {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  100% { transform: scale(4.6); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb .ping, .mode[data-mode="gather"] .thumb .off { animation: none; }
+  .thumb .walker { display: none; }
+}
+
+/* ----------------------------------------------------------------- enter */
+
+#enter {
+  flex: none;
+  width: 100%;
+  padding: 14px 20px;
   font: inherit;
   font-weight: 600;
   color: #0b0d12;
   background: var(--ink);
   border: 0;
-  border-radius: 9px;
+  border-radius: 10px;
   cursor: pointer;
   transition: transform 0.12s ease, opacity 0.2s ease;
 }
-button:hover:not(:disabled) { transform: translateY(-1px); }
-button:disabled { opacity: 0.45; cursor: progress; }
+#enter:hover:not(:disabled) { transform: translateY(-1px); }
+#enter:disabled { opacity: 0.4; cursor: progress; }
 
 .controls {
-  margin: 16px 0 0;
-  font-size: 12px;
-  color: var(--muted);
+  flex: none;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--faint);
 }
+
+/* -------------------------------------------------------------------- hud */
 
 .hud {
   position: fixed;
@@ -112,6 +258,8 @@ button:disabled { opacity: 0.45; cursor: progress; }
   transition: opacity 0.2s ease;
 }
 .stem.strong { opacity: 1; }
+.stem.held .name { color: var(--ink); font-weight: 600; }
+.stem.held .bar { box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.35); }
 
 .dot { width: 9px; height: 9px; border-radius: 50%; }
 .name { color: var(--muted); }
@@ -129,100 +277,29 @@ button:disabled { opacity: 0.45; cursor: progress; }
   border-top: 1px solid var(--edge);
   font-size: 11px;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--faint);
 }
 
-/* The world is a walking experience; a phone cannot pointer-lock. */
-@media (max-width: 680px) {
-  .hint::after {
-    content: " Best on a laptop with headphones.";
-    display: block;
-    margin-top: 8px;
-    color: #d8b26a;
-  }
-}
-
-/* A stem you are carrying, and one whose monument has been silenced. */
-.stem.held .name { color: var(--ink); font-weight: 600; }
-.stem.held .bar { box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.35); }
-
-/* Song chooser on the entry card. */
-.songs {
-  display: grid;
-  gap: 7px;
-  margin: 0 0 18px;
-}
-.songs button.song {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 14px;
-  font: inherit;
-  font-size: 14px;
-  color: var(--ink);
-  text-align: left;
-  background: transparent;
-  border: 1px solid var(--edge);
-  border-radius: 9px;
-  cursor: pointer;
-  transition: background 0.16s ease, border-color 0.16s ease;
-}
-.songs button.song:hover { background: rgba(242, 240, 234, 0.07); }
-.songs button.song[aria-current="true"] {
-  background: rgba(242, 240, 234, 0.12);
-  border-color: rgba(242, 240, 234, 0.45);
-}
-.songs .song .who {
-  font-style: italic;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-/* Stop / resume, inside the HUD. */
 .pause {
   width: 100%;
   margin-top: 11px;
   padding: 7px 10px;
+  font: inherit;
   font-size: 12px;
-  font-weight: 500;
   color: var(--muted);
   background: transparent;
   border: 1px solid var(--edge);
   border-radius: 7px;
+  cursor: pointer;
 }
 .pause:hover { color: var(--ink); background: rgba(242, 240, 234, 0.07); }
 
-/* Mode picker on the entry card. */
-.modes {
-  display: grid;
-  gap: 7px;
-  margin: 0 0 14px;
-}
-.modes button.mode {
-  display: block;
-  width: 100%;
-  padding: 10px 14px;
-  font: inherit;
-  color: var(--ink);
-  text-align: left;
-  background: transparent;
-  border: 1px solid var(--edge);
-  border-radius: 9px;
-  cursor: pointer;
-  transition: background 0.16s ease, border-color 0.16s ease;
-}
-.modes button.mode:hover { background: rgba(242, 240, 234, 0.07); }
-.modes button.mode[aria-current="true"] {
-  background: rgba(242, 240, 234, 0.12);
-  border-color: rgba(242, 240, 234, 0.45);
-}
-.modes .what { display: block; font-size: 14px; font-weight: 600; }
-.modes .why {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--muted);
+/* ------------------------------------------------------------- narrow */
+
+@media (max-width: 720px) {
+  .modes { grid-template-columns: 1fr; }
+  .mode { flex-direction: row; align-items: center; text-align: left; }
+  .thumb { width: 104px; flex: none; }
+  .mode .shot { position: static; width: 104px; flex: none; }
+  .controls { display: none; }
 }
