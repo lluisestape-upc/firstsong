@@ -15,6 +15,17 @@ const isParam = (x) => x && typeof x === 'object' && 'value' in x;
 const _forward = new Vector3();
 const _up = new Vector3();
 
+/**
+ * How sharply a stem fades as you walk away from it, and therefore how much
+ * approaching one is rewarded. Higher = more contrast between standing on top
+ * of a monument and standing between two of them.
+ *   1.0  gentle, the whole mix stays present wherever you stand
+ *   1.7  approaching a monument clearly favours it            <- default
+ *   2.5  strongly local, the far stems drop close to silence
+ * Tune live: __firstsong.mix.setRolloff(2.0)
+ */
+export const DEFAULT_ROLLOFF = 1.7;
+
 function setListener(listener, position, forward, up) {
   if (isParam(listener.positionX)) {
     listener.positionX.value = position.x;
@@ -34,11 +45,31 @@ function setListener(listener, position, forward, up) {
 }
 
 export class SpatialMix {
-  constructor() {
+  constructor(rolloff = DEFAULT_ROLLOFF) {
     this.ctx = null;
     this.stems = [];
     this.playing = false;
     this.startedAt = 0;
+    this.rolloff = rolloff;
+  }
+
+  /** Change the distance falloff on every stem at once, while playing. */
+  setRolloff(value) {
+    this.rolloff = value;
+    for (const stem of this.stems) stem.panner.rolloffFactor = value;
+    return value;
+  }
+
+  /** What each stem's panner is currently contributing, for tuning by ear. */
+  distances(camera) {
+    return this.stems.map((stem) => {
+      const [x, y, z] = stem.spec.position;
+      const d = Math.hypot(camera.position.x - x, camera.position.y - y,
+                           camera.position.z - z);
+      const ref = stem.panner.refDistance;
+      const gain = d <= ref ? 1 : ref / (ref + this.rolloff * (d - ref));
+      return { name: stem.spec.name, distance: +d.toFixed(1), gain: +gain.toFixed(3) };
+    });
   }
 
   /** Fetch and decode every stem. Call before start(). */
@@ -65,7 +96,7 @@ export class SpatialMix {
         panner.distanceModel = 'inverse';
         panner.refDistance = spec.ref_distance ?? 4;
         panner.maxDistance = spec.max_distance ?? 30;
-        panner.rolloffFactor = 1.3;
+        panner.rolloffFactor = this.rolloff;
         const [x, y, z] = spec.position;
         if (isParam(panner.positionX)) {
           panner.positionX.value = x;
