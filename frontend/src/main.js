@@ -93,6 +93,11 @@ async function boot() {
     const acted = interaction.takeOrPlace();
     if (acted) sky.dismiss();      // they worked it out; the hint is done
   });
+
+  // The sky acknowledges the song coming back together, then gets out of the way.
+  interaction.onChange = (what) => {
+    if (what === 'assembled') sky.announce('all of it, together');
+  };
   stage.addEventListener('hushOrWake', () => interaction.hushOrWake());
   stage.addEventListener('soloStart', () => interaction.startSolo());
   stage.addEventListener('soloEnd', () => interaction.endSolo());
@@ -107,8 +112,15 @@ async function boot() {
 
   dom.enter.disabled = false;
   dom.enter.textContent = 'Step inside';
+  let started = false;
   dom.enter.addEventListener('click', async () => {
-    if (mix.playing) { await mix.resume(); } else { mix.start(); }
+    if (mix.playing) {
+      await mix.resume();
+    } else {
+      mix.start();
+      // Only on the very first entry: coming back should not undo the song.
+      if (!started) { interaction.beginAsleep(); started = true; }
+    }
     setPauseLabel();
     stage.enter();
   });
@@ -162,9 +174,9 @@ async function boot() {
     if (stage.active) trail.update(stage.camera.position);
     pad.update(stage.camera.position, dt, interaction.dirty);
     sky.update(dt);
-    // The hint only appears when you are next to something and have not yet
-    // discovered that you can pick it up.
-    sky.showHint(Boolean(interaction.focus));
+    // One discovery at a time: while the song is still being assembled, the
+    // sky says nothing about carrying.
+    sky.showHint(interaction.assembled && Boolean(interaction.focus));
 
     for (const monument of monuments) {
       const stem = byName.get(monument.spec.name);

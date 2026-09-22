@@ -62,6 +62,19 @@ export class SkyText {
     scene.add(this.group);
   }
 
+  /**
+   * Say something once, briefly, then never again. Used to mark the moment the
+   * song is whole, which otherwise passes without acknowledgement.
+   */
+  announce(text, seconds = 5) {
+    if (this.announcement) this.group.remove(this.announcement);
+    this.announcement = textPlane(text, { size: 58, opacity: 0, italic: true });
+    this.announcement.scale.setScalar(0.7);
+    this.announcement.position.set(0, 20, 0);
+    this.group.add(this.announcement);
+    this.announceUntil = this.elapsed + seconds;
+  }
+
   /** Show the hint. Ignored once the player has proved they do not need it. */
   showHint(show = true) {
     if (this.dismissed) return;
@@ -93,6 +106,19 @@ export class SkyText {
     const ease = Math.min(1, dt * 1.2);
     const d = this.dedication.material;
     d.opacity += (this.dedicationTarget * breath - d.opacity) * ease;
+
+    if (this.announcement) {
+      const a = this.announcement.material;
+      const target = this.elapsed < this.announceUntil ? 0.5 : 0;
+      a.opacity += (target * breath - a.opacity) * Math.min(1, dt * 1.6);
+      this.announcement.lookAt(
+        this.camera.position.x, this.announcement.position.y - 6, this.camera.position.z
+      );
+      if (a.opacity < 0.01 && target === 0) {
+        this.group.remove(this.announcement);
+        this.announcement = null;
+      }
+    }
 
     if (this.hint) {
       const h = this.hint.material;

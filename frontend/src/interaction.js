@@ -13,6 +13,8 @@
 import * as THREE from 'three';
 
 const REACH = 7.0;          // how close you must be to touch a monument
+const WAKE_RADIUS = 9.5;    // how close a sleeping monument wakes on its own
+const WAKE_SWELL = 1.6;     // seconds for a layer to arrive, not switch on
 const FACING = 0.25;        // dot(forward, toMonument): generous, not a laser
 const CARRY_AHEAD = 3.4;    // how far in front a carried monument floats
 const CARRY_BELOW = 0.55;   // and how far below eye level
@@ -33,13 +35,63 @@ export class Interaction {
     this.original = monuments.map((m) => ({
       name: m.spec.name, position: [...m.spec.position],
     }));
+    this.sleeping = new Set();
     this.onChange = () => {};
+  }
+
+  /**
+   * Put the song to sleep except for one layer, so that walking around is what
+   * assembles it. A judge with ninety seconds needs a reason to keep moving,
+   * and the reason should be the music rather than a prompt on screen.
+   *
+   * Nothing has to be pressed: a monument wakes when you come near it. There
+   * is no way to get this wrong and nothing to explain.
+   */
+  beginAsleep() {
+    // The stem that carries most of the track stays audible, so the world
+    // sounds like music from the first second rather than like silence.
+    const seed = this.monuments.reduce((best, m) =>
+      (m.spec.features?.presence ?? 0) > (best.spec.features?.presence ?? 0) ? m : best
+    );
+
+    for (const monument of this.monuments) {
+      if (monument === seed) continue;
+      this.sleeping.add(monument.spec.name);
+      monument.hushed = true;
+      monument.dim = 1;                       // asleep from the very first frame
+      this.mix.setStemMuted(this.stemFor(monument), true, 0.01);
+    }
+    this.onChange('sleep', seed);
+    return seed;
+  }
+
+  get assembled() {
+    return this.sleeping.size === 0;
+  }
+
+  /** Wake whatever the player has wandered close to. */
+  _wakeNearby() {
+    if (!this.sleeping.size) return;
+    const position = this.stage.camera.position;
+
+    for (const monument of this.monuments) {
+      if (!this.sleeping.has(monument.spec.name)) continue;
+      if (monument.group.position.distanceTo(position) > WAKE_RADIUS) continue;
+
+      this.sleeping.delete(monument.spec.name);
+      monument.hushed = false;
+      // A long ramp: the layer arrives, it does not click on.
+      this.mix.setStemMuted(this.stemFor(monument), false, WAKE_SWELL);
+      this.onChange(this.assembled ? 'assembled' : 'discovered', monument);
+    }
   }
 
   /** True once anything has been moved or hushed: what the pad can undo. */
   get dirty() {
     if (this.carrying) return true;
     return this.monuments.some((m, i) => {
+      // Asleep is not "changed": there is nothing yet to put back.
+      if (this.sleeping.has(m.spec.name)) return false;
       if (m.hushed) return true;
       const from = this.original[i].position;
       const p = m.spec.position;
@@ -60,6 +112,7 @@ export class Interaction {
 
     for (const monument of this.monuments) {
       if (monument === this.carrying) continue;
+      if (this.sleeping.has(monument.spec.name)) continue;
       _toward.copy(monument.group.position).sub(camera.position);
       const distance = _toward.length();
       if (distance > REACH) continue;
@@ -147,6 +200,7 @@ export class Interaction {
       monument.setPosition(x, y, z);
       monument.spec.position = [x, y, z];
       monument.hushed = false;
+      this.sleeping.delete(monument.spec.name);
       this.mix.setStemMuted(this.stemFor(monument), false);
     }
     this.mix.resetPositions(this.original);
@@ -155,6 +209,7 @@ export class Interaction {
 
   /** Call once per frame, after the camera has moved. */
   update() {
+    this._wakeNearby();
     this.focus = this.carrying ? null : this.nearest();
 
     const held = this.carrying;
