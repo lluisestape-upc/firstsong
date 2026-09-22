@@ -102,6 +102,10 @@ export async function buildMonument(spec, baseUrl) {
     lift: 0,
     /** 0 awake, 1 fully hushed. */
     dim: 0,
+    /** 1 the moment it is sent home, 0 once it has landed. */
+    homing: 0,
+    /** Extra rotation picked up in flight. Accumulated so it never snaps back. */
+    spin: 0,
 
     /** Where this monument stands now. Changes when the player puts it down. */
     setPosition(x, y, z) {
@@ -121,11 +125,15 @@ export async function buildMonument(spec, baseUrl) {
       const awake = 1 - this.dim;
       const beat = level * awake;
 
-      body.scale.setScalar(baseScale * (1 + beat * 0.14 + this.lift * 0.08));
+      // A monument on its way home draws itself in and spins, so a shape in
+      // flight never looks like a shape that happens to be drifting past.
+      const tuck = this.homing * 0.18;
+      body.scale.setScalar(baseScale * (1 + beat * 0.14 + this.lift * 0.08 - tuck));
       // A carried monument spins a little faster: it reads as "in your hands".
-      body.rotation.y = elapsed * (0.08 + this.lift * 0.5);
+      this.spin += dt * this.homing * 7.0;
+      body.rotation.y = elapsed * (0.08 + this.lift * 0.5) + this.spin;
 
-      if (!this.carried) {
+      if (!this.carried && this.homing <= 0) {
         group.position.y = this.baseY
           + Math.sin(elapsed * 0.6) * (0.12 + this.lift * 0.3)
           + beat * 0.25;

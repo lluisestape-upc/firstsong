@@ -21,24 +21,52 @@ export class Recorder {
     this.since = 0;
     this.playing = false;
     this.playhead = 0;
+    this.startedAtSongTime = 0;
+    this.clock = 0;
     this.onState = () => {};
   }
 
+  /** Forget the walk so far. Entering Echo starts a fresh recording. */
+  clear() {
+    this.stop();
+    this.samples = [];
+    this.since = 0;
+  }
+
+  /** Where in the track this walk began, so a replay can hear the same music. */
+  get songStart() {
+    if (!this.samples.length) return 0;
+    return this.startedAtSongTime + this.samples[0].t;
+  }
+
+  /** How much walking is held right now, oldest sample to newest. */
   get seconds() {
-    return this.samples.length ? this.samples[this.samples.length - 1].t : 0;
+    if (this.samples.length < 2) return 0;
+    return this.samples[this.samples.length - 1].t - this.samples[0].t;
   }
 
   /** Call every frame while the player is walking. */
   record(dt, songTime) {
-    if (this.playing) return;
+    // Only what was walked counts. Standing in the menu is not a walk, and a
+    // stationary stretch recorded there would replay as a stare at nothing.
+    if (this.playing || !this.stage.active) return;
+
+    // The clock is wall time, not song time: the track loops, and a walk that
+    // crosses the seam would otherwise jump backwards mid-recording.
+    if (this.samples.length === 0) {
+      this.clock = 0;
+      this.startedAtSongTime = songTime;
+    } else {
+      this.clock += dt;
+    }
+
     this.since += dt;
     if (this.since < INTERVAL) return;
     this.since = 0;
 
     const { camera, yaw, pitch } = this.stage;
-    if (this.samples.length === 0) this.startedAtSongTime = songTime;
     this.samples.push({
-      t: songTime - this.startedAtSongTime,
+      t: this.clock,
       x: camera.position.x, z: camera.position.z, yaw, pitch,
     });
 
@@ -49,7 +77,9 @@ export class Recorder {
   play() {
     if (this.samples.length < 8) return false;
     this.playing = true;
-    this.playhead = 0;
+    // Start at the oldest sample still held, not at zero: on a long walk the
+    // front of the recording has been dropped and t no longer starts there.
+    this.playhead = this.samples[0].t;
     this.onState('play', this.seconds);
     return true;
   }

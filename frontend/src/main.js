@@ -48,15 +48,20 @@ async function renderChooser(currentId) {
   }
 }
 
-const MODES = ['gather', 'wander', 'blind'];
+const MODES = ['gather', 'wander', 'pulse', 'echo', 'blind'];
 
 // The one sentence each mode needs. It goes in the sky, not on the menu: the
 // menu shows what a mode looks like, the world says what to do in it.
 const INSTRUCTION = {
   gather: 'walk up to a shape to wake it',
   wander: 'where you stand is the mix',
+  pulse: 'jump when the drum does',
+  echo: 'walk a while, then press R',
   blind: 'find the sound, then press E',
 };
+
+// How many landings in a row on the beat buy back a layer of the song.
+const PULSE_RUN = 3;
 
 function readMode() {
   const asked = new URLSearchParams(location.search).get('mode');
@@ -127,9 +132,58 @@ async function boot() {
 
   stage.addEventListener('replay', () => {
     if (recorder.playing) { recorder.stop(); return; }
-    if (recorder.play()) sky.announce('again, the way you walked it', 4);
+    if (!recorder.play()) return;
+    // Over the same stretch of the track it was walked to, or it would be a
+    // different mix from the one the walk actually made.
+    mix.seek(recorder.songStart);
+    trail.clear();
+    sky.announce('again, the way you walked it', 4);
   });
   const currentMode = bindModes(() => {});
+
+  // Which game is running, so that coming back in from the menu continues it
+  // rather than starting it over. Picking a different mode does restart.
+  let running = null;
+  let echoNudged = false;
+
+  function startMode(mode) {
+    // Pulse is the one mode where walking up to a sleeping shape does nothing:
+    // there the only way back into the song is to land on the beat.
+    interaction.wakeOnApproach = mode !== 'pulse';
+    if (mode !== 'blind' && blind.active) blind.active = false;
+    sky.say(INSTRUCTION[mode]);
+
+    const fresh = mode !== running || (mode === 'blind' && !blind.active);
+    running = mode;
+    if (!fresh) return;
+
+    switch (mode) {
+      case 'blind':
+        blind.start();
+        break;
+      case 'gather':
+        interaction.beginAsleep();
+        break;
+      case 'pulse':
+        beat.reset();
+        interaction.beginAsleep('drums');
+        break;
+      case 'echo':
+        // A clean sheet: the mix you are about to hear should be the walk you
+        // are about to take, not whatever wandering came before it.
+        interaction.wakeAll();
+        interaction.reset();
+        recorder.clear();
+        trail.clear();
+        echoNudged = false;
+        break;
+      default:
+        // Wander is the world as it was built: whole, and nothing asleep.
+        interaction.wakeAll();
+        interaction.reset();
+        break;
+    }
+  }
 
   stage.addEventListener('takeOrPlace', () => {
     // In Blind the same key commits to a spot instead of picking things up.
@@ -151,6 +205,13 @@ async function boot() {
   stage.addEventListener('land', () => {
     // Every landing answers the beat; only a landing on the pad resets.
     beat.land(mix.songTime(), stage.camera.position);
+
+    // Pulse: a run of landings on the beat earns a layer of the song back.
+    if (running === 'pulse' && beat.streak > 0 && beat.streak % PULSE_RUN === 0) {
+      interaction.wakeOne();
+    }
+
+    if (blind.active) return;         // mid-round, the pad is not in play
     if (!pad.contains(stage.camera.position)) return;
     pad.fire();
     interaction.reset();
@@ -168,18 +229,9 @@ async function boot() {
       mix.start();
       started = true;
     }
-    // Picking a mode from the card always (re)starts that mode, so a judge can
-    // try all three without reloading.
-    sky.say(INSTRUCTION[mode]);
-    if (mode === 'blind') {
-      blind.start();
-    } else {
-      if (blind.active) blind.active = false;
-      if (mode === 'gather' && !interaction.everGathered) {
-        interaction.beginAsleep();
-        interaction.everGathered = true;
-      }
-    }
+    // Picking a different mode from the card starts it; picking the one that
+    // is already running just drops you back into it.
+    startMode(mode);
     setPauseLabel();
     stage.enter();
   });
@@ -234,12 +286,20 @@ async function boot() {
       stage.step(dt);
       recorder.record(dt, mix.songTime());
     }
-    interaction.update();
+    interaction.update(dt);
     mix.update(stage.camera);
     if (stage.active) trail.update(stage.camera.position);
     blind.update(dt);
     beat.update(dt);
     pad.update(stage.camera.position, dt, !blind.active && interaction.dirty);
+
+    // Echo: the first instruction has faded by the time there is a walk worth
+    // hearing, so say it again once, at the moment it becomes true.
+    if (running === 'echo' && !echoNudged && !recorder.playing
+        && recorder.seconds > 20) {
+      echoNudged = true;
+      sky.say('press R to walk it again', 8);
+    }
     sky.update(dt);
     // One discovery at a time: while the song is still being assembled, the
     // sky says nothing about carrying.

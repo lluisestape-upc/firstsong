@@ -57,6 +57,74 @@
             <span class="what">Wander</span>
           </button>
 
+          <button class="mode" data-mode="pulse" role="radio" aria-checked="false" aria-label="Pulse">
+            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
+              <path class="ground" d="M10 58 H110" />
+              <g class="ticks">
+                <path d="M20 54 V62" /><path d="M44 54 V62" />
+                <path d="M68 54 V62" /><path d="M92 54 V62" />
+              </g>
+              <g class="floor">
+                <ellipse cx="44" cy="58" rx="3" ry="1.2" class="floor-ring">
+                  <animate attributeName="rx" values="3;16" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
+                  <animate attributeName="ry" values="1.2;6" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.65;0" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
+                </ellipse>
+                <ellipse cx="68" cy="58" rx="3" ry="1.2" class="floor-ring">
+                  <animate attributeName="rx" values="3;16" dur="1.8s" begin="1.2s" repeatCount="indefinite"/>
+                  <animate attributeName="ry" values="1.2;6" dur="1.8s" begin="1.2s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.65;0" dur="1.8s" begin="1.2s" repeatCount="indefinite"/>
+                </ellipse>
+                <ellipse cx="92" cy="58" rx="3" ry="1.2" class="floor-ring">
+                  <animate attributeName="rx" values="3;16" dur="1.8s" begin="1.8s" repeatCount="indefinite"/>
+                  <animate attributeName="ry" values="1.2;6" dur="1.8s" begin="1.8s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.65;0" dur="1.8s" begin="1.8s" repeatCount="indefinite"/>
+                </ellipse>
+              </g>
+              <path id="hopPath" class="hop"
+                    d="M20 58 Q32 8 44 58 Q56 8 68 58 Q80 8 92 58" />
+              <circle r="4" class="hopper">
+                <animateMotion dur="1.8s" repeatCount="indefinite">
+                  <mpath href="#hopPath"/>
+                </animateMotion>
+              </circle>
+            </svg>
+            <img class="shot" src="modes/pulse.webp" alt=""
+                 onerror="this.remove()">
+            <span class="what">Pulse</span>
+          </button>
+
+          <button class="mode" data-mode="echo" role="radio" aria-checked="false" aria-label="Echo">
+            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
+              <g class="dots">
+                <circle cx="30" cy="20" r="5" class="on"/>
+                <circle cx="86" cy="18" r="5" class="on"/>
+                <circle cx="96" cy="58" r="5" class="on"/>
+                <circle cx="26" cy="56" r="5" class="on"/>
+              </g>
+              <path id="echoPath" class="route"
+                    d="M28 62 C 12 40, 34 22, 56 34 S 96 24, 100 44 S 64 70, 28 62" />
+              <circle r="3.6" class="walker">
+                <animateMotion dur="6s" repeatCount="indefinite">
+                  <mpath href="#echoPath"/>
+                </animateMotion>
+              </circle>
+              <circle r="3.6" class="ghost">
+                <animateMotion dur="6s" begin="-1.3s" repeatCount="indefinite">
+                  <mpath href="#echoPath"/>
+                </animateMotion>
+              </circle>
+              <circle r="3.6" class="ghost fainter">
+                <animateMotion dur="6s" begin="-2.4s" repeatCount="indefinite">
+                  <mpath href="#echoPath"/>
+                </animateMotion>
+              </circle>
+            </svg>
+            <img class="shot" src="modes/echo.webp" alt=""
+                 onerror="this.remove()">
+            <span class="what">Echo</span>
+          </button>
+
           <button class="mode" data-mode="blind" role="radio" aria-checked="false" aria-label="Blind">
             <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
               <g class="dots">

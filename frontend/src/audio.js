@@ -238,6 +238,38 @@ export class SpatialMix {
     return this.paused;
   }
 
+  /**
+   * Jump the whole song to a point in the track. Every source is replaced and
+   * restarted at one shared moment with the same offset, so the stems come back
+   * phase-locked: restarting them one at a time would smear the drums against
+   * the bass by however long the loop took.
+   *
+   * Echo mode needs this. A walk is remembered against the song's clock, so
+   * playing the walk back over a different part of the track would be a
+   * different mix from the one that was actually made.
+   */
+  seek(seconds) {
+    if (!this.ctx || !this.playing || this.paused) return false;
+    const length = this.stems[0]?.buffer.duration || 1;
+    const offset = ((seconds % length) + length) % length;
+
+    for (const stem of this.stems) {
+      try { stem.source?.stop(); } catch { /* already stopped */ }
+    }
+    const t0 = this.ctx.currentTime + 0.08;
+    for (const stem of this.stems) {
+      const source = this.ctx.createBufferSource();
+      source.buffer = stem.buffer;
+      source.loop = true;
+      source.connect(stem.gain);
+      source.start(t0, offset);
+      stem.source = source;
+    }
+    // songTime() measures from startedAt, so back-date it by the offset.
+    this.startedAt = t0 - offset;
+    return true;
+  }
+
   /** Call once per frame with the camera. */
   update(camera) {
     if (!this.ctx) return;

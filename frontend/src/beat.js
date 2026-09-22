@@ -35,6 +35,13 @@ export class Beat {
       this.pool.push({ mesh, life: 0, span: 1, reach: 6 });
     }
     this.next = 0;
+    this.accuracy = 0;
+  }
+
+  /** Start a fresh run of jumps. */
+  reset() {
+    this.streak = 0;
+    this.accuracy = 0;
   }
 
   /** Seconds from the nearest beat, or null when there are no beats. */
@@ -64,6 +71,7 @@ export class Beat {
     if (offset === null) return null;
 
     const accuracy = Math.max(0, 1 - Math.abs(offset) / WINDOW);
+    this.accuracy = accuracy;
     if (accuracy > 0) {
       this.streak++;
       this.best = Math.max(this.best, this.streak);
