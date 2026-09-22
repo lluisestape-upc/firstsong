@@ -7,7 +7,10 @@
  * The static mode is what gets submitted: judges should not need a server
  * running to try the piece. scripts/export_static.py produces that layout.
  */
-const STATIC_ROOT = '/worlds';
+// Relative on purpose: a static build may be served from a subdirectory
+// (GitHub Pages does exactly that), where a leading slash points at the
+// domain root and misses everything.
+const STATIC_ROOT = 'worlds';
 
 let mode = null;
 

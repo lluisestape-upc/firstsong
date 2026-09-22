@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Pages serves this from /<repo>/, not from the domain root, so every asset
+  // reference has to be relative or it resolves to the wrong place.
+  base: './',
   server: {
     port: 5173,
     proxy: {
