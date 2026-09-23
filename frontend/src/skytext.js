@@ -1,23 +1,25 @@
 /**
- * A line written in the sky.
+ * Words written in the world.
  *
- * It carries the one sentence the world cannot teach by itself: what you are
- * meant to do in the mode you picked. It belongs in the sky rather than in a
- * dialog, because once you are inside the piece should have no interface left.
- * It fades once you have clearly understood it.
+ * Every line here is a thing standing at a place: it is given one position and
+ * one facing when it is written, and it never moves again. It does not hang
+ * off the camera, it does not swim when you jump, and it does not turn to
+ * follow you. Walk away from it and it is behind you, like anything else.
+ *
+ * Three kinds, differing only in where they are written and how long they
+ * last:
+ *   say       the one sentence a mode needs, written ahead of you as you come
+ *             in, and faded out once you have clearly understood it.
+ *   announce  a single remark, briefly, at the moment it is true.
+ *   pin       a sign at a place somebody else chose, held until replaced.
  */
 import * as THREE from 'three';
 
-// Ahead of the player rather than nailed to a point in the world: pinned to
-// the sky over the origin it sat at about sixty degrees up, which means
-// craning your neck to read it. Hung ahead at this distance and height it
-// comes in at roughly twenty degrees, a glance rather than a stretch.
-const AHEAD = 26;
-const INSTRUCTION_HEIGHT = 9.5;
+const AHEAD = 26;               // how far in front a written line stands
+const INSTRUCTION_HEIGHT = 9.5; // about twenty degrees up at that distance
 const ANNOUNCE_HEIGHT = 6.5;
 
 const _ahead = new THREE.Vector3();
-const _vec = new THREE.Vector3();
 
 function textPlane(text, { size = 88, width = 2048, opacity = 0.5, italic = false }) {
   const canvas = document.createElement('canvas');
@@ -57,40 +59,57 @@ export class SkyText {
     this.instruction = null;
     this.instructionUntil = 0;
     this.announcement = null;
+    this.announceUntil = 0;
     this.sign = null;
     this.elapsed = 0;
     scene.add(this.group);
   }
 
+  /** A point out in front of where the camera is facing, right now, once. */
+  _ahead(height) {
+    this.camera.getWorldDirection(_ahead);
+    _ahead.y = 0;
+    if (_ahead.lengthSq() < 1e-6) _ahead.set(0, 0, -1);
+    _ahead.normalize().multiplyScalar(AHEAD).add(this.camera.position);
+    return { x: _ahead.x, y: this.camera.position.y + height, z: _ahead.z };
+  }
+
   /**
-   * The line for the mode just entered. Held for a while, then faded: long
-   * enough to read twice, short enough that the sky is empty by the time you
-   * are actually playing.
+   * Stand a line at a place, facing where the reader is at this instant, and
+   * leave it there. Both the position and the facing are set once: turning
+   * afterwards must not move a single vertex of it.
+   */
+  _stand(mesh, at) {
+    mesh.position.set(at.x, at.y, at.z);
+    mesh.lookAt(this.camera.position.x, at.y, this.camera.position.z);
+    this.group.add(mesh);
+  }
+
+  /**
+   * The line for the mode just entered. Written in front of you as you arrive,
+   * held long enough to read twice, then faded, so the sky is empty by the
+   * time you are actually playing.
    */
   say(text, seconds = 14) {
     if (this.instruction) this.group.remove(this.instruction);
     this.instruction = textPlane(text, { size: 74, opacity: 0, italic: true });
-    this.instruction.position.copy(this.camera.position);
-    this.group.add(this.instruction);
+    this._stand(this.instruction, this._ahead(INSTRUCTION_HEIGHT));
     this.instructionUntil = this.elapsed + seconds;
   }
 
   /**
-   * A sign, not a line of narration: it is written at one place in the world
-   * and stays there. It does not drift with where you are looking, it does not
-   * fade on a timer, and it does not come back when you move. Each level of
-   * Pulse hangs one over the platform its run starts from, and it hangs there
-   * until the next level replaces it.
+   * A sign, not narration: it is written at one place in the world and stays
+   * there until something replaces it. Each level of Pulse hangs one out along
+   * the run it belongs to.
    */
   pin(text, position, { height = 5.5, size = 62, scale = 0.38 } = {}) {
     this.unpin();
     this.sign = textPlane(text, { size, opacity: 0, italic: true });
     // Small: a pinned line is read from one place at one distance, so it can
-    // be sized for that. The lines that follow the camera have to be huge
-    // because they are read from anywhere.
+    // be sized for that. A line written ahead of a walker has to be huge
+    // because it might be read from anywhere.
     this.sign.scale.setScalar(scale);
-    this.sign.position.set(position.x, position.y + height, position.z);
-    this.group.add(this.sign);
+    this._stand(this.sign, { x: position.x, y: position.y + height, z: position.z });
     return this.sign;
   }
 
@@ -113,63 +132,34 @@ export class SkyText {
     if (this.announcement) this.group.remove(this.announcement);
     this.announcement = textPlane(text, { size: 58, opacity: 0, italic: true });
     this.announcement.scale.setScalar(0.7);
-    this.announcement.position.copy(this.camera.position);
-    this.group.add(this.announcement);
+    this._stand(this.announcement, this._ahead(ANNOUNCE_HEIGHT));
     this.announceUntil = this.elapsed + seconds;
   }
 
+  /** Only opacity changes here. Nothing written ever moves. */
   update(dt) {
     this.elapsed += dt;
 
-    const breath = 0.86 + Math.sin(this.elapsed * 0.35) * 0.14;
-
-    // Where a line should hang right now: ahead of where you are facing.
-    this.camera.getWorldDirection(_ahead);
-    _ahead.y = 0;
-    if (_ahead.lengthSq() < 1e-6) _ahead.set(0, 0, -1);
-    _ahead.normalize().multiplyScalar(AHEAD).add(this.camera.position);
-
-    const hang = (mesh, height) => {
-      // Ease across so turning around does not teleport the words.
-      mesh.position.lerp(
-        _vec.set(_ahead.x, this.camera.position.y + height, _ahead.z),
-        Math.min(1, dt * 1.1)
-      );
-      mesh.lookAt(this.camera.position.x, mesh.position.y, this.camera.position.z);
+    const fade = (mesh, held, full) => {
+      const material = mesh.material;
+      const target = held ? full : 0;
+      material.opacity += (target - material.opacity) * Math.min(1, dt * 1.4);
+      return material.opacity > 0.01 || target > 0;
     };
 
-    if (this.instruction) {
-      const m = this.instruction.material;
-      const target = this.elapsed < this.instructionUntil ? 0.52 : 0;
-      m.opacity += (target * breath - m.opacity) * Math.min(1, dt * 1.4);
-      hang(this.instruction, INSTRUCTION_HEIGHT);
-      if (m.opacity < 0.01 && target === 0) {
-        this.group.remove(this.instruction);
-        this.instruction = null;
-      }
+    if (this.instruction
+        && !fade(this.instruction, this.elapsed < this.instructionUntil, 0.5)) {
+      this.group.remove(this.instruction);
+      this.instruction = null;
     }
 
-    if (this.sign) {
-      const s = this.sign.material;
-      // Fades up once and then holds, with no breath in it: a sign that
-      // pulsed would read as something arriving rather than something there.
-      if (s.opacity < 0.46) s.opacity += Math.min(1, dt * 1.2) * (0.5 - s.opacity);
-      // Only the facing follows you, so the words stay legible from the
-      // approach; where they hang never moves.
-      this.sign.lookAt(this.camera.position.x, this.sign.position.y,
-                       this.camera.position.z);
+    if (this.announcement
+        && !fade(this.announcement, this.elapsed < this.announceUntil, 0.48)) {
+      this.group.remove(this.announcement);
+      this.announcement = null;
     }
 
-    if (this.announcement) {
-      const a = this.announcement.material;
-      const target = this.elapsed < this.announceUntil ? 0.5 : 0;
-      a.opacity += (target * breath - a.opacity) * Math.min(1, dt * 1.6);
-      hang(this.announcement, ANNOUNCE_HEIGHT);
-      if (a.opacity < 0.01 && target === 0) {
-        this.group.remove(this.announcement);
-        this.announcement = null;
-      }
-    }
-
+    // A sign has no timer: it fades up once and then simply is there.
+    if (this.sign) fade(this.sign, true, 0.46);
   }
 }
