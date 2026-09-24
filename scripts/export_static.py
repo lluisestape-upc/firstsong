@@ -57,7 +57,10 @@ def main():
         for sub in COPY_SUBDIRS:
             source = manifest.parent / sub
             if source.is_dir():
-                shutil.copytree(source, target / sub, dirs_exist_ok=True)
+                # slim_models.py keeps the full-size mesh next to the slimmed
+                # one. Shipping both would double the download for nothing.
+                shutil.copytree(source, target / sub, dirs_exist_ok=True,
+                                ignore=shutil.ignore_patterns("*.full.glb"))
 
         index.append({
             "id": world["id"],

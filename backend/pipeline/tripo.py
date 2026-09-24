@@ -54,6 +54,12 @@ class TripoClient:
             raise TripoError(f"tripo error code={payload.get('code')} {payload.get('message')}")
         return payload.get("data", {})
 
+    def balance(self) -> dict:
+        """Credits left on the account. Free, and worth printing before a run."""
+        return self._unwrap(
+            self.session.get(f"{BASE_URL}/user/balance", timeout=30)
+        )
+
     def text_to_model(self, prompt: str, negative_prompt: str = "",
                       face_limit: int = 20000, **extra) -> str:
         body = {
