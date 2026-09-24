@@ -64,9 +64,18 @@ export async function buildMonument(spec, baseUrl) {
   // around it instead of fighting normaliseScale.
   const baseScale = body.scale.x;
   group.add(body);
-  // How far this thing sticks up above its own origin, so a course can be
-  // built over the whole skyline rather than through it.
-  const reach = new THREE.Box3().setFromObject(body).max.y;
+
+  // Stand it on its feet. A model arrives centred on its own origin, so
+  // placing the group at the height the pipeline chose buried half the object:
+  // fine when these were abstract lumps, absurd once one of them is a bass
+  // guitar sunk to the waist. Measured once here and reapplied in pulse(),
+  // because the beat scales the body and scaling moves its foot.
+  const bounds = new THREE.Box3().setFromObject(body);
+  const foot = -bounds.min.y / baseScale;
+  body.position.y = foot * baseScale;
+  // How tall it stands above the group origin, so Pulse can build its course
+  // over the whole skyline rather than through it.
+  const reach = bounds.max.y - bounds.min.y;
 
   // A halo on the ground marking where this stem still reaches you.
   const halo = new THREE.Mesh(
@@ -137,6 +146,9 @@ export async function buildMonument(spec, baseUrl) {
       // flight never looks like a shape that happens to be drifting past.
       const tuck = this.homing * 0.18;
       body.scale.setScalar(baseScale * (1 + beat * 0.14 + this.lift * 0.08 - tuck));
+      // Keep the feet on the group origin as it breathes, or a loud stem
+      // sinks by a fraction of its own height on every beat.
+      body.position.y = foot * body.scale.y;
       // A carried monument spins a little faster: it reads as "in your hands".
       this.spin += dt * this.homing * 7.0;
       body.rotation.y = elapsed * (0.08 + this.lift * 0.5) + this.spin;
