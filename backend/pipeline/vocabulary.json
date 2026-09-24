@@ -1,52 +1,52 @@
 {
-  "_comment": "The art lives here. Edit freely, no code changes needed. Subjects are BARE noun phrases with no article: the template adds 'a'/'an'. Theme: 'a world as a gift, for the kid I used to be', so the vocabulary is childhood objects at monument scale.",
+  "_comment": "The art lives here. Edit freely, no code changes needed. Subjects are BARE noun phrases with no article: the template adds 'a'/'an'. One instrument per stem, so a monument says what it is the moment you see it; the variants within a role are all the same instrument, only presented differently. What the music decides is the rest of the line: material from brightness, size from density, condition from noisiness.",
   "template": "{article} {size} {subject}, built from {material}, {condition}, {style}",
   "roles": {
     "drums": {
       "subject": [
-        "stack of tin drums and bicycle wheels",
-        "playground climbing frame",
-        "scaffold of swing sets welded together"
+        "drum kit with a bass drum, snare, toms and cymbals",
+        "drum kit with cracked cymbals and a split bass drum head",
+        "drum kit half sunk into the ground, cymbals still upright"
       ],
       "hue_base": 18
     },
     "bass": {
       "subject": [
-        "sleeping stone animal half sunk into the earth",
-        "mossy boulder shaped like a sofa",
-        "upturned hull of a buried wooden boat"
+        "upright double bass standing on its endpin",
+        "upright double bass leaning as if just set down",
+        "electric bass guitar standing upright on its strap"
       ],
       "hue_base": 265
     },
     "other": {
       "subject": [
-        "tree grown out of brass instruments and copper pipes",
-        "chandelier of hanging toys and music boxes",
-        "spiral staircase of stacked books and radios"
+        "gramophone with a wide flared horn",
+        "brass tuba standing on its bell",
+        "pipe organ with its front rank of pipes exposed"
       ],
       "hue_base": 140
     },
     "vocals": {
       "subject": [
-        "child-sized figure folded from paper lanterns",
-        "lit paper lantern on a tall thin pole",
-        "empty wooden chair with a glowing coat draped over it"
+        "vintage ribbon microphone on a tall boom stand",
+        "vintage ribbon microphone on a stand, cable coiled at its foot",
+        "large studio microphone hanging from above in its shock mount"
       ],
       "hue_base": 45
     },
     "guitar": {
       "subject": [
-        "washing line strung with paper kites",
-        "fence woven from bicycle spokes and fishing wire",
-        "row of wind chimes hung from a dead tree"
+        "acoustic guitar standing upright on its lower bout",
+        "electric guitar standing upright on its strap",
+        "acoustic guitar leaning as if just set down"
       ],
       "hue_base": 8
     },
     "piano": {
       "subject": [
-        "upright piano with the front panel removed, ivy in the strings",
-        "staircase of piano keys climbing into nothing",
-        "music stand holding an open book the size of a door"
+        "upright piano with the front panel removed, hammers and strings exposed",
+        "grand piano with the lid raised",
+        "upright piano with the keyboard lid open"
       ],
       "hue_base": 205
     }
@@ -82,25 +82,25 @@
       {
         "max": 0.33,
         "words": [
-          "solitary",
-          "quiet",
-          "sparse"
+          "small",
+          "modest",
+          "compact"
         ]
       },
       {
         "max": 0.66,
         "words": [
-          "modest",
-          "layered",
-          "many-part"
+          "large",
+          "oversized",
+          "tall"
         ]
       },
       {
         "max": 1.01,
         "words": [
-          "sprawling",
+          "colossal",
           "towering",
-          "densely tangled"
+          "enormous"
         ]
       }
     ],

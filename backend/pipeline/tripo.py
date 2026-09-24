@@ -13,10 +13,20 @@ import time
 import pathlib
 
 import requests
+from requests.adapters import HTTPAdapter
+from requests.exceptions import RequestException
+from urllib3.util.retry import Retry
 
 from . import config
 
 BASE_URL = "https://api.tripo3d.ai/v2/openapi"
+
+# A task is charged the moment it is accepted, so losing the network while
+# polling means paying for a model and never collecting it. Both layers below
+# exist for that: urllib3 retries the blips, and wait() rides out an outage of
+# a couple of minutes rather than abandoning work already paid for.
+POLL_FAILURES_ALLOWED = 8
+DOWNLOAD_TRIES = 4
 
 # 1 credit = $0.01 USD. text_to_model base cost by model family, plus a
 # texture surcharge of +10 for standard quality (detailed +20, extreme +30).
@@ -44,6 +54,13 @@ class TripoClient:
             raise TripoError("TRIPO_API_KEY is not set. Put it in .env")
         self.session = requests.Session()
         self.session.headers["Authorization"] = f"Bearer {self.api_key}"
+        retry = Retry(
+            total=5, connect=5, read=5, status=4,
+            status_forcelist=(429, 500, 502, 503, 504),
+            backoff_factor=1.5,
+            allowed_methods=frozenset({"GET", "POST"}),
+        )
+        self.session.mount("https://", HTTPAdapter(max_retries=retry))
 
     def _unwrap(self, response: requests.Response) -> dict:
         try:
@@ -87,8 +104,24 @@ class TripoClient:
              on_progress=None) -> dict:
         deadline = time.time() + timeout_s
         last = -1
+        failures = 0
         while time.time() < deadline:
-            task = self.get_task(task_id)
+            try:
+                task = self.get_task(task_id)
+            except RequestException as exc:
+                # Their side is still working on it whatever happens here, and
+                # it is already paid for. Keep asking.
+                failures += 1
+                if failures >= POLL_FAILURES_ALLOWED:
+                    raise TripoError(
+                        f"lost contact with task {task_id} after {failures} "
+                        f"attempts: {exc}"
+                    ) from exc
+                if on_progress:
+                    on_progress(f"offline ({failures})", last if last >= 0 else 0)
+                time.sleep(min(30.0, poll_s * 2 ** failures))
+                continue
+            failures = 0
             status = task.get("status")
             progress = task.get("progress", 0)
             if on_progress and progress != last:
@@ -109,11 +142,22 @@ class TripoClient:
             raise TripoError(f"task {task.get('task_id')} has no model url: {output}")
 
         dest.parent.mkdir(parents=True, exist_ok=True)
-        with requests.get(url, stream=True, timeout=300) as response:
-            response.raise_for_status()
-            with open(dest, "wb") as handle:
-                for chunk in response.iter_content(chunk_size=1 << 16):
-                    handle.write(chunk)
+        # Plain requests, not self.session: the file lives on their CDN and the
+        # API key has no business being sent to another host.
+        for attempt in range(1, DOWNLOAD_TRIES + 1):
+            try:
+                with requests.get(url, stream=True, timeout=300) as response:
+                    response.raise_for_status()
+                    with open(dest, "wb") as handle:
+                        for chunk in response.iter_content(chunk_size=1 << 16):
+                            handle.write(chunk)
+                return dest
+            except RequestException as exc:
+                # The link expires about five minutes after the task finishes,
+                # so there is no point being patient for long.
+                if attempt == DOWNLOAD_TRIES:
+                    raise TripoError(f"could not download {task.get('task_id')}: {exc}") from exc
+                time.sleep(2.0 * attempt)
         return dest
 
     def generate(self, prompt: str, dest: pathlib.Path, negative_prompt: str = "",

@@ -20,8 +20,28 @@ import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
+from requests.exceptions import RequestException
+
 from backend.pipeline import config
+from backend.pipeline.prompts import build_prompt, load_vocabulary
 from backend.pipeline.tripo import TripoClient, TripoError, estimate_credits
+
+
+def refresh_prompts(world: dict) -> int:
+    """Re-derive every prompt from the current vocabulary.json.
+
+    The prompts are written into world.json when a world is first built, so
+    editing the vocabulary afterwards changes nothing until they are rebuilt.
+    The descriptors stay as they were measured: only the words move.
+    """
+    vocab = load_vocabulary()
+    changed = 0
+    for stem in world["stems"]:
+        fresh = build_prompt(stem["name"], stem["features"], world["title"], vocab)
+        if fresh["prompt"] != stem.get("prompt"):
+            changed += 1
+        stem.update(fresh)
+    return changed
 
 
 def worlds_in_cache() -> list[str]:
@@ -42,14 +62,22 @@ def pending(world: dict, only: list[str] | None, force: bool) -> list[dict]:
     return out
 
 
-def generate_for(world_id: str, client: TripoClient, only, force, dry_run) -> int:
+def generate_for(world_id: str, client: TripoClient, only, force, dry_run,
+                 refresh: bool = False) -> int:
     world_dir = config.CACHE_DIR / world_id
     manifest = world_dir / "world.json"
     world = json.loads(manifest.read_text(encoding="utf-8"))
-    todo = pending(world, only, force)
 
     each = estimate_credits(client.model_version)
     print(f"\n=== {world_id} · {world['title']} ===")
+
+    if refresh:
+        changed = refresh_prompts(world)
+        if not dry_run:
+            manifest.write_text(json.dumps(world, indent=2), encoding="utf-8")
+        print(f"  {changed} prompt(s) rewritten from the current vocabulary")
+
+    todo = pending(world, only, force)
     if not todo:
         print("  nothing to do, every stem already has a mesh")
         return 0
@@ -70,15 +98,28 @@ def generate_for(world_id: str, client: TripoClient, only, force, dry_run) -> in
         def progress(status, percent, _name=name):
             print(f"      {status} {percent}%", end="\r", flush=True)
 
-        try:
-            client.generate(
-                stem["prompt"], dest,
-                negative_prompt=stem.get("negative_prompt", ""),
-                on_progress=progress,
-            )
-        except TripoError as exc:
-            print(f"      failed: {exc}")
+        # One retry: a run of fifteen of these takes half an hour, and losing
+        # the lot to a blink of the wifi is not worth being strict about.
+        done = False
+        for attempt in (1, 2):
+            try:
+                client.generate(
+                    stem["prompt"], dest,
+                    negative_prompt=stem.get("negative_prompt", ""),
+                    on_progress=progress,
+                )
+                done = True
+                break
+            except (TripoError, RequestException) as exc:
+                print(f"      attempt {attempt} failed: {str(exc)[:140]}")
+                if attempt == 1:
+                    time.sleep(20)
+        if not done:
             continue
+
+        # A slimmed mesh keeps the full-size one beside it. That backup belongs
+        # to the model that has just been replaced, so it goes with it.
+        dest.with_suffix(".full.glb").unlink(missing_ok=True)
 
         stem["model"] = f"models/{name}.glb"
         manifest.write_text(json.dumps(world, indent=2), encoding="utf-8")
@@ -99,6 +140,10 @@ def main():
                         help="regenerate meshes that already exist")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the prompts and what they would cost")
+    parser.add_argument("--refresh-prompts", action="store_true",
+                        help="rebuild the prompts from vocabulary.json first, "
+                             "for when the vocabulary has changed since the "
+                             "world was built")
     args = parser.parse_args()
 
     if not args.world and not args.all:
@@ -116,7 +161,8 @@ def main():
     before = client.balance().get("balance")
     print(f"tripo {client.model_version} · balance {before:,.0f} credits")
 
-    spent = sum(generate_for(w, client, only, args.force, args.dry_run) for w in ids)
+    spent = sum(generate_for(w, client, only, args.force, args.dry_run,
+                             args.refresh_prompts) for w in ids)
 
     if not args.dry_run:
         after = client.balance().get("balance")
