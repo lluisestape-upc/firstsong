@@ -10,6 +10,7 @@ import { BlindGame } from './blind.js';
 import { Beat } from './beat.js';
 import { Course } from './course.js';
 import { Recorder } from './recorder.js';
+import { Words } from './words.js';
 import { cacheUrl, getWorld, listWorlds, resolveWorldId } from './api.js';
 
 const dom = {
@@ -130,14 +131,22 @@ async function boot() {
   );
   for (const monument of monuments) stage.scene.add(monument.group);
 
+  // The lyrics' objects download while the stems decode: neither waits on
+  // the other.
+  const words = new Words(stage.scene, world.words || [], base);
+  const wordsReady = words.load();
+
   const mix = new SpatialMix();
   dom.enter.textContent = 'Decoding stems…';
   await mix.load(world, base, (done, total, name) => {
     dom.enter.textContent = `Decoding ${name} (${done}/${total})…`;
   });
+  await wordsReady;
 
   // Pair each monument with its stem by name.
   const byName = new Map(mix.stems.map((stem) => [stem.spec.name, stem]));
+  const singer = monuments.find((m) => m.spec.name === 'vocals');
+  const voice = byName.get('vocals');
 
   const interaction = new Interaction(stage, mix, monuments);
   const trail = new Trail(stage.scene, world.environment.sky_bottom);
@@ -336,7 +345,7 @@ async function boot() {
   await renderChooser(world.id);
   window.__firstsong = {
     stage, mix, world, monuments, environment, interaction, trail, pad, sky,
-    blind, beat, course, recorder,
+    blind, beat, course, recorder, words,
   };
 
   let elapsed = 0;
@@ -355,6 +364,12 @@ async function boot() {
     mix.update(stage.camera);
     if (stage.active) trail.update(stage.camera.position);
     blind.update(dt);
+
+    // The words leave the singer, wherever the singer has been carried to,
+    // and only while the singer can be heard.
+    if (singer) words.origin.copy(singer.group.position).setY(singer.top * 0.8);
+    words.setVisible(!blind.active);
+    words.update(dt, mix.songTime(), mix.playing && (!voice || !voice.muted));
     beat.update(dt);
     // The course blinks on the beat, which is the only teaching Pulse does.
     if (running === 'pulse') course.update(dt, beat.offsetFrom(mix.songTime()));
