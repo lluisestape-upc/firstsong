@@ -406,3 +406,94 @@ h1 {
   .mode[data-mode="discover"] .thumb .falling { animation: none; }
   .thumb .packet { display: none; }
 }
+
+/* ----------------------------------------------------------------- lyrics */
+
+.thumb .word { stroke: none; }
+.thumb .word.w1 { fill: #ff9aa2; }
+.thumb .word.w2 { fill: #ffd59a; }
+.thumb .word.w3 { fill: #a8d8ff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb .word { display: none; }
+}
+
+/* --------------------------------------------------------------- tutorial */
+
+/* Bottom centre, above everything in the world and clear of the HUD in the
+   corner: the one thing on screen that is allowed to explain. */
+.tutorial {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  padding: 14px 20px 14px;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--edge-strong);
+  border-radius: 14px;
+  transition: opacity 0.3s ease, border-color 0.3s ease;
+  pointer-events: none;
+}
+.tutorial.hidden,
+.tutorial.away { opacity: 0; }
+.tutorial.arrive { animation: step-in 0.45s ease both; }
+.tutorial.ticked { border-color: #a8f0c6; }
+
+@keyframes step-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.tutorial-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.tutorial-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(242, 240, 234, 0.18);
+}
+.tutorial-dots i.done { background: rgba(242, 240, 234, 0.55); }
+.tutorial-dots i.now { background: var(--ink); transform: scale(1.3); }
+
+.tutorial-text {
+  margin: 0 0 10px;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.tutorial-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.tutorial-keys { display: inline-flex; gap: 5px; }
+.tutorial-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.tutorial-skip { margin-left: auto; }
+.tutorial-count:empty,
+.tutorial-keys:empty { display: none; }
+
+kbd {
+  display: inline-block;
+  min-width: 26px;
+  padding: 3px 7px;
+  font: 600 12px ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink);
+  background: rgba(242, 240, 234, 0.08);
+  border: 1px solid var(--edge-strong);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial.arrive { animation: none; }
+}

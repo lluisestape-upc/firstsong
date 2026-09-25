@@ -13,6 +13,7 @@ import { Recorder } from './recorder.js';
 import { Words } from './words.js';
 import { Table, TABLE_HEIGHT } from './table.js';
 import { Inspector } from './inspect.js';
+import { Tutorial } from './tutorial.js';
 import { cacheUrl, getWorld, listWorlds, resolveWorldId } from './api.js';
 
 const dom = {
@@ -26,6 +27,7 @@ const dom = {
   readout: document.getElementById('stem-readout'),
   meta: document.getElementById('meta'),
   controls: document.querySelector('.controls'),
+  tutorial: document.getElementById('tutorial'),
 };
 
 /** Offer the other worlds, if there is more than one. Switching reloads. */
@@ -54,7 +56,7 @@ async function renderChooser(currentId) {
 
 // Discover and Play are the two on the menu. The rest are still here, reached
 // with ?mode=, while it is decided whether they come back.
-const MODES = ['discover', 'play', 'gather', 'wander', 'pulse', 'echo', 'blind'];
+const MODES = ['discover', 'play', 'lyrics', 'gather', 'wander', 'pulse', 'echo', 'blind'];
 const TABLE_MODES = new Set(['discover', 'play']);
 
 // The one sentence each mode needs. It goes in the sky, not on the menu: the
@@ -62,6 +64,7 @@ const TABLE_MODES = new Set(['discover', 'play']);
 const INSTRUCTION = {
   discover: 'walk up to an instrument and press F',
   play: 'the table in the middle is yours',
+  lyrics: 'every word that is sung becomes a thing',
   gather: 'walk up to a shape to wake it',
   wander: 'where you stand is the mix',
   echo: 'walk a while, then press R',
@@ -173,6 +176,46 @@ async function boot() {
     scene: stage.scene, stage, mix, monuments, bpm: world.mix.tempo,
   });
   const inspector = new Inspector({ stage, table, mix });
+
+  // What the player has actually done, counted, so each tutorial step can
+  // wait for the real thing rather than for a timer.
+  const seen = {
+    walked: 0, discovered: 0, took: 0, inspected: 0, changed: 0, listened: 0, closed: 0,
+  };
+  inspector.onEvent = (what) => {
+    if (what === 'open') seen.inspected++;
+    if (what === 'change') seen.changed++;
+    if (what === 'listen') seen.listened++;
+    if (what === 'close') seen.closed++;
+  };
+  const total = monuments.length;
+  const found = () => total - interaction.sleeping.size;
+
+  const tutorial = new Tutorial(dom.tutorial, [
+    { text: 'Walk with W A S D and look around with the mouse',
+      keys: ['W', 'A', 'S', 'D'], done: () => seen.walked > 3 },
+    { text: 'Walk up to one of the instruments',
+      done: () => !!interaction.nearestAny() },
+    { text: 'Press F to hear it',
+      keys: ['F'], done: () => seen.discovered > 0 },
+    { text: 'Find the others. Each one you find joins the song',
+      keys: ['F'], progress: () => `${found()} of ${total}`,
+      done: () => interaction.sleeping.size === 0 },
+    { text: 'Something landed in the middle. Go to it',
+      done: () => table.inReach },
+    { text: 'Point at an effect on the table and press E to pick it up',
+      keys: ['E'], done: () => seen.took > 0 },
+    { text: 'Set it down next to one of the little instruments',
+      keys: ['E'], done: () => table.pucks.some((p) => p.on) },
+    { text: 'Point at it and press Enter to go inside the effect',
+      keys: ['Enter'], done: () => seen.inspected > 0 },
+    { text: 'W and S change the value, A and D choose another one',
+      keys: ['W', 'S', 'A', 'D'], done: () => seen.changed >= 2 },
+    { text: 'Hold F to hear only what the effect adds',
+      keys: ['F'], done: () => seen.listened > 0 },
+    { text: 'Press Enter to come back out. The table is yours now',
+      keys: ['Enter'], done: () => seen.closed > 0 },
+  ]);
   const TABLE_SIGN = 'set an effect next to an instrument';
   // Read from a few metres away, not twenty like Pulse's signs, so it is
   // hung low and small, just over the table.
@@ -181,7 +224,7 @@ async function boot() {
 
   table.onChange = (what) => {
     if (inspector.active) inspector.draw();
-    if (what === 'take') sky.dismiss();
+    if (what === 'take') { sky.dismiss(); seen.took++; }
   };
   // The sign goes up when the table comes down, not before: in Discover there
   // is nothing to explain until there is a table to explain.
@@ -226,9 +269,15 @@ async function boot() {
     if (!TABLE_MODES.has(mode)) table.hide();
 
     if (mode !== 'blind' && blind.active) blind.active = false;
-    if (mode !== 'pulse') sky.say(INSTRUCTION[mode]);
 
     const fresh = mode !== running || (mode === 'blind' && !blind.active);
+    // The tutorial belongs to Discover: leaving it half-way puts it away
+    // without counting it as done, so it is there again next time.
+    if (mode !== 'discover') tutorial.stop();
+    // While the tutorial is talking, the sky stays quiet: one voice at a time.
+    const teaching = mode === 'discover' && (tutorial.active || (fresh && !tutorial.seen));
+    if (mode !== 'pulse' && !teaching) sky.say(INSTRUCTION[mode]);
+
     running = mode;
     if (!fresh) return;
 
@@ -241,6 +290,15 @@ async function boot() {
         interaction.sleepAll();
         table.hide();
         stage.placeAt(0, 0, 0);
+        tutorial.start();
+        break;
+      case 'lyrics':
+        // The song from the top, the whole band, and a world that starts
+        // empty: the words build it as they are sung.
+        interaction.wakeAll();
+        interaction.reset();
+        mix.seek(0);
+        words.restart();
         break;
       case 'play':
         interaction.wakeAll();
@@ -307,6 +365,7 @@ async function boot() {
   interaction.onChange = (what) => {
     // Waking the first one proves the instruction landed.
     if (what === 'discovered') sky.dismiss();
+    if (what === 'discovered' || what === 'assembled') seen.discovered++;
     // Discover's reward for finding every instrument is the table itself.
     if (what === 'assembled' && running === 'discover') {
       table.drop();
@@ -395,6 +454,7 @@ async function boot() {
   // refuses to capture the cursor the piece must still be playable.
   stage.addEventListener('enter', () => {
     dom.overlay.classList.add('hidden');
+    dom.tutorial.classList.remove('away');
     dom.hud.classList.remove('hidden');
     // One frame later the pointerlockchange event has settled.
     setTimeout(() => {
@@ -419,6 +479,8 @@ async function boot() {
     setPauseLabel();
     dom.overlay.classList.remove('hidden');
     dom.hud.classList.add('hidden');
+    // The tutorial waits behind the menu and picks up where it was.
+    dom.tutorial.classList.add('away');
     dom.enter.textContent = 'Back inside';
   });
 
@@ -427,13 +489,17 @@ async function boot() {
   await renderChooser(world.id);
   window.__firstsong = {
     stage, mix, world, monuments, environment, interaction, trail, pad, sky,
-    blind, beat, course, recorder, words, table, inspector,
+    blind, beat, course, recorder, words, table, inspector, tutorial, seen,
   };
 
   let elapsed = 0;
-  function frame() {
-    requestAnimationFrame(frame);
-    const dt = Math.min(stage.clock.getDelta(), 0.05);
+  /**
+   * One frame of the whole world. Split from the rAF loop so it can also be
+   * stepped by hand from the console (__firstsong.tick(1/60)) when the page
+   * is not being painted, which is how the tutorial and the table get tested.
+   */
+  function tick(fixed) {
+    const dt = fixed ?? Math.min(stage.clock.getDelta(), 0.05);
     elapsed += dt;
 
     // While a replay runs, or while you are inside an effect, something else
@@ -453,9 +519,18 @@ async function boot() {
 
     // The words leave the singer, wherever the singer has been carried to,
     // and only while the singer can be heard.
-    if (singer) words.origin.copy(singer.group.position).setY(singer.top * 0.8);
-    words.setVisible(!blind.active);
-    words.update(dt, mix.songTime(), mix.playing && (!voice || !voice.muted));
+    // Only in Lyrics: everywhere else the world is the band and the table.
+    const lyrics = running === 'lyrics';
+    words.setVisible(lyrics);
+    if (lyrics) {
+      if (singer) words.origin.copy(singer.group.position).setY(singer.top * 0.8);
+      words.update(dt, mix.songTime(), mix.playing && (!voice || !voice.muted));
+    }
+
+    if (stage.active && !inspecting) {
+      seen.walked += Math.hypot(stage.velocity.x, stage.velocity.z) * dt;
+    }
+    tutorial.update(dt);
     beat.update(dt);
     // The course blinks on the beat, which is the only teaching Pulse does.
     if (running === 'pulse') course.update(dt, beat.offsetFrom(mix.songTime()));
@@ -497,6 +572,12 @@ async function boot() {
     }
 
     stage.render();
+  }
+  window.__firstsong.tick = tick;
+
+  function frame() {
+    requestAnimationFrame(frame);
+    tick();
   }
   frame();
 }

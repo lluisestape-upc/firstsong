@@ -57,6 +57,9 @@ export class Inspector {
     this.selected = 0;
     this.t = 0;
     this.listening = false;
+    // Told about 'open', 'change', 'listen' and 'close', so the tutorial can
+    // tell when each has actually been done.
+    this.onEvent = () => {};
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = W;
@@ -118,6 +121,7 @@ export class Inspector {
     this.panel.lookAt(this.toPos);
     this.panel.visible = true;
     this.draw();
+    this.onEvent('open');
     return true;
   }
 
@@ -132,6 +136,7 @@ export class Inspector {
     this.fromPos.copy(camera.position);
     this.fromQuat.copy(camera.quaternion);
     this.panel.visible = false;
+    this.onEvent('close');
   }
 
   /** Leave at once, no tween: the menu has been opened. */
@@ -151,6 +156,7 @@ export class Inspector {
   listen(on) {
     if (!this.puck || on === this.listening) return;
     this.listening = on;
+    if (on) this.onEvent('listen');
     this.puck.effect.setWetOnly(on);
     const stem = this.puck.on?.stem || null;
     this.mix.soloStem(on ? stem : null);
@@ -164,9 +170,13 @@ export class Inspector {
     let used = true;
     switch (event.code) {
       case 'KeyW': case 'ArrowUp':
-        this.puck.effect.nudge(names[this.selected], +1); break;
+        this.puck.effect.nudge(names[this.selected], +1);
+        this.onEvent('change');
+        break;
       case 'KeyS': case 'ArrowDown':
-        this.puck.effect.nudge(names[this.selected], -1); break;
+        this.puck.effect.nudge(names[this.selected], -1);
+        this.onEvent('change');
+        break;
       case 'KeyD': case 'ArrowRight':
         this.selected = (this.selected + 1) % names.length; break;
       case 'KeyA': case 'ArrowLeft':

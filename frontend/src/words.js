@@ -136,6 +136,12 @@ export class Words {
     return this;
   }
 
+  /** Start the world over: the next update counts from wherever the song is. */
+  restart() {
+    this.last = -1;
+    for (const item of this.items) item.holder.visible = false;
+  }
+
   /** Where a newly sung word is born: the singer, if there is one. */
   setOrigin(position) {
     this.origin.copy(position);

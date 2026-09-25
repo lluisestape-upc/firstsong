@@ -57,10 +57,41 @@
                  onerror="this.remove()">
             <span class="what">Play</span>
           </button>
+
+          <button class="mode" data-mode="lyrics" role="radio" aria-checked="false" aria-label="Lyrics">
+            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
+              <path id="lyricA" class="route" d="M60 62 Q34 18 18 40"/>
+              <path id="lyricB" class="route" d="M60 62 Q62 6 64 22"/>
+              <path id="lyricC" class="route" d="M60 62 Q92 16 102 42"/>
+              <circle cx="60" cy="62" r="5" class="on"/>
+              <path class="word w1" d="M0 -3 C-4 -8 -9 -2 0 5 C9 -2 4 -8 0 -3Z">
+                <animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#lyricA"/></animateMotion>
+              </path>
+              <rect class="word w2" x="-3.5" y="-3.5" width="7" height="7" rx="1.5">
+                <animateMotion dur="2.4s" begin="-0.8s" repeatCount="indefinite"><mpath href="#lyricB"/></animateMotion>
+              </rect>
+              <path class="word w3" d="M0 -5 L1.5 -1.5 L5 -1.5 L2.2 0.8 L3.2 4.5 L0 2.4 L-3.2 4.5 L-2.2 0.8 L-5 -1.5 L-1.5 -1.5Z">
+                <animateMotion dur="2.4s" begin="-1.6s" repeatCount="indefinite"><mpath href="#lyricC"/></animateMotion>
+              </path>
+            </svg>
+            <img class="shot" src="modes/lyrics.webp" alt=""
+                 onerror="this.remove()">
+            <span class="what">Lyrics</span>
+          </button>
         </div>
 
         <button id="enter" disabled>Loading…</button>
         <p class="controls">W A S D walk &middot; mouse look &middot; F listen &middot; E take &middot; Enter inside an effect &middot; Esc let go</p>
+      </div>
+    </div>
+
+    <div id="tutorial" class="tutorial hidden" role="status" aria-live="polite">
+      <div class="tutorial-dots" aria-hidden="true"></div>
+      <p class="tutorial-text"></p>
+      <div class="tutorial-row">
+        <span class="tutorial-keys"></span>
+        <span class="tutorial-count"></span>
+        <span class="tutorial-skip"><kbd>H</kbd> skip</span>
       </div>
     </div>
 
