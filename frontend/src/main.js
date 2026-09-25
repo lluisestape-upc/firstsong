@@ -11,6 +11,8 @@ import { Beat } from './beat.js';
 import { Course } from './course.js';
 import { Recorder } from './recorder.js';
 import { Words } from './words.js';
+import { Table, TABLE_HEIGHT } from './table.js';
+import { Inspector } from './inspect.js';
 import { cacheUrl, getWorld, listWorlds, resolveWorldId } from './api.js';
 
 const dom = {
@@ -50,11 +52,16 @@ async function renderChooser(currentId) {
   }
 }
 
-const MODES = ['gather', 'wander', 'pulse', 'echo', 'blind'];
+// Discover and Play are the two on the menu. The rest are still here, reached
+// with ?mode=, while it is decided whether they come back.
+const MODES = ['discover', 'play', 'gather', 'wander', 'pulse', 'echo', 'blind'];
+const TABLE_MODES = new Set(['discover', 'play']);
 
 // The one sentence each mode needs. It goes in the sky, not on the menu: the
 // menu shows what a mode looks like, the world says what to do in it.
 const INSTRUCTION = {
+  discover: 'walk up to an instrument and press F',
+  play: 'the table in the middle is yours',
   gather: 'walk up to a shape to wake it',
   wander: 'where you stand is the mix',
   echo: 'walk a while, then press R',
@@ -84,7 +91,7 @@ function faceTowards(stage, from, to) {
 
 function readMode() {
   const asked = new URLSearchParams(location.search).get('mode');
-  return MODES.includes(asked) ? asked : 'gather';
+  return MODES.includes(asked) ? asked : 'discover';
 }
 
 function bindModes(onPick) {
@@ -162,6 +169,24 @@ async function boot() {
   // the one that finishes the song.
   const PULSE_LEVELS = Math.max(1, world.stems.length - 1);
 
+  const table = new Table({
+    scene: stage.scene, stage, mix, monuments, bpm: world.mix.tempo,
+  });
+  const inspector = new Inspector({ stage, table, mix });
+  const TABLE_SIGN = 'set an effect next to an instrument';
+  // Read from a few metres away, not twenty like Pulse's signs, so it is
+  // hung low and small, just over the table.
+  const pinTableSign = () => sky.pin(TABLE_SIGN, { x: 0, y: TABLE_HEIGHT, z: 0 },
+                                     { height: 1.35, scale: 0.075 });
+
+  table.onChange = (what) => {
+    if (inspector.active) inspector.draw();
+    if (what === 'take') sky.dismiss();
+  };
+  // The sign goes up when the table comes down, not before: in Discover there
+  // is nothing to explain until there is a table to explain.
+  table.onLanded = pinTableSign;
+
   stage.addEventListener('replay', () => {
     if (recorder.playing) { recorder.stop(); return; }
     if (!recorder.play()) return;
@@ -183,7 +208,7 @@ async function boot() {
     // there the only way back into the song is to land on the beat. It is also
     // the only one with anything to stand on above the plain, and the only one
     // where the song decides how high a jump goes.
-    interaction.wakeOnApproach = mode !== 'pulse';
+    interaction.wakeOnApproach = mode !== 'pulse' && mode !== 'discover';
     if (mode === 'pulse') {
       stage.groundAt = (x, z, feet) => course.heightAt(x, z, feet);
       stage.jumpPower = () => beat.liftAt(mix.songTime());
@@ -194,8 +219,12 @@ async function boot() {
       // than dropped out of the sky onto a plain that just appeared.
       if (stage.altitude > 0.5) stage.placeAt(0, 0, 0);
       course.clear();
-      sky.unpin();
+      if (mode !== running) sky.unpin();
     }
+    // The table and the pad both want the middle of the world.
+    pad.group.visible = !TABLE_MODES.has(mode);
+    if (!TABLE_MODES.has(mode)) table.hide();
+
     if (mode !== 'blind' && blind.active) blind.active = false;
     if (mode !== 'pulse') sky.say(INSTRUCTION[mode]);
 
@@ -204,6 +233,24 @@ async function boot() {
     if (!fresh) return;
 
     switch (mode) {
+      case 'discover':
+        // Silence, and a table still up in the sky. Every instrument found
+        // brings its layer in; finding the last one brings the table down.
+        interaction.wakeOnApproach = false;
+        interaction.reset();
+        interaction.sleepAll();
+        table.hide();
+        stage.placeAt(0, 0, 0);
+        break;
+      case 'play':
+        interaction.wakeAll();
+        interaction.reset();
+        table.show();
+        pinTableSign();
+        stage.placeAt(0, 0, 4.4);
+        stage.yaw = 0;
+        stage.pitch = -0.22;
+        break;
       case 'blind':
         blind.start();
         break;
@@ -241,21 +288,54 @@ async function boot() {
   stage.addEventListener('takeOrPlace', () => {
     // In Blind the same key commits to a spot instead of picking things up.
     if (blind.active) { blind.guess(); return; }
+    if (inspector.active) return;
+    // At the table, E moves effects; anywhere else it carries monuments.
+    if (table.takeOrPlace()) return;
     if (interaction.takeOrPlace()) sky.dismiss();
+  });
+
+  // Enter: go inside the effect you are pointing at, or come back out.
+  stage.addEventListener('inspect', () => {
+    if (inspector.active) { inspector.close(); return; }
+    const puck = table.carrying || table.aimed;
+    if (!puck) return;
+    if (table.carrying) table.takeOrPlace();     // set it down first
+    inspector.open(puck);
   });
 
   // The sky acknowledges the song coming back together, then gets out of the way.
   interaction.onChange = (what) => {
     // Waking the first one proves the instruction landed.
     if (what === 'discovered') sky.dismiss();
+    // Discover's reward for finding every instrument is the table itself.
+    if (what === 'assembled' && running === 'discover') {
+      table.drop();
+      return;
+    }
     // Pulse says this itself, in its own pinned line over the last platform.
     if (what === 'assembled' && running !== 'pulse') {
       sky.announce('all of it, together');
     }
   };
   stage.addEventListener('hushOrWake', () => interaction.hushOrWake());
-  stage.addEventListener('soloStart', () => interaction.startSolo());
-  stage.addEventListener('soloEnd', () => interaction.endSolo());
+
+  // F is "listen": to one instrument alone, to one effect alone from inside
+  // it, and in Discover, to an instrument for the first time.
+  stage.addEventListener('soloStart', () => {
+    if (inspector.active) { inspector.listen(true); return; }
+    if (running === 'discover') {
+      const target = interaction.nearestAny();
+      if (target && interaction.sleeping.has(target.spec.name)) {
+        interaction.wake(target, 0.6);
+        return;
+      }
+    }
+    interaction.startSolo();
+  });
+  stage.addEventListener('soloEnd', () => {
+    if (inspector.active) { inspector.listen(false); return; }
+    interaction.endSolo();
+  });
 
   // Land a jump on the pad and the world goes back to how it was found.
   stage.addEventListener('land', (event) => {
@@ -286,6 +366,7 @@ async function boot() {
     }
 
     if (blind.active) return;         // mid-round, the pad is not in play
+    if (!pad.group.visible) return;   // the table has the middle in these modes
     if (!pad.contains(stage.camera.position)) return;
     pad.fire();
     interaction.reset();
@@ -318,8 +399,8 @@ async function boot() {
     // One frame later the pointerlockchange event has settled.
     setTimeout(() => {
       dom.controls.textContent = stage.needsDragHint
-        ? 'W A S D to walk · drag to look · E take · Q hush · Esc to let go'
-        : 'W A S D to walk · mouse to look · E take · Q hush · Esc to let go';
+        ? 'W A S D walk · drag to look · F listen · E take · Enter inside an effect · Esc let go'
+        : 'W A S D walk · mouse to look · F listen · E take · Enter inside an effect · Esc let go';
     }, 120);
   });
   const setPauseLabel = () => {
@@ -332,6 +413,7 @@ async function boot() {
   });
 
   stage.addEventListener('exit', async () => {
+    inspector.cancel();
     // Letting go stops the song too: nobody wants it playing at a menu.
     await mix.pause();
     setPauseLabel();
@@ -345,7 +427,7 @@ async function boot() {
   await renderChooser(world.id);
   window.__firstsong = {
     stage, mix, world, monuments, environment, interaction, trail, pad, sky,
-    blind, beat, course, recorder, words,
+    blind, beat, course, recorder, words, table, inspector,
   };
 
   let elapsed = 0;
@@ -354,12 +436,16 @@ async function boot() {
     const dt = Math.min(stage.clock.getDelta(), 0.05);
     elapsed += dt;
 
-    // While a replay is running it drives the camera and input is ignored.
-    const replaying = recorder.update(dt);
-    if (!replaying) {
+    // While a replay runs, or while you are inside an effect, something else
+    // holds the camera and walking is ignored.
+    const inspecting = inspector.update(dt);
+    const replaying = !inspecting && recorder.update(dt);
+    if (!replaying && !inspecting) {
       stage.step(dt);
+      table.push(stage.camera.position);
       recorder.record(dt, mix.songTime());
     }
+    table.update(dt, mix.songTime());
     interaction.update(dt);
     mix.update(stage.camera);
     if (stage.active) trail.update(stage.camera.position);

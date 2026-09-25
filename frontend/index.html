@@ -19,122 +19,48 @@
         <nav id="songs" class="songs" aria-label="Song"></nav>
 
         <div id="modes" class="modes" role="radiogroup" aria-label="Mode">
-          <button class="mode" data-mode="gather" role="radio" aria-checked="true" aria-label="Gather">
+          <button class="mode" data-mode="discover" role="radio" aria-checked="true" aria-label="Discover">
             <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
               <g class="dots">
-                <circle cx="24" cy="26" r="6" class="off" style="--i:0"/>
-                <circle cx="58" cy="16" r="6" class="off" style="--i:1"/>
-                <circle cx="96" cy="30" r="6" class="off" style="--i:2"/>
-                <circle cx="80" cy="58" r="6" class="off" style="--i:3"/>
-                <circle cx="38" cy="58" r="7" class="on"/>
+                <circle cx="20" cy="30" r="6" class="off" style="--i:0"/>
+                <circle cx="46" cy="60" r="6" class="off" style="--i:1"/>
+                <circle cx="76" cy="60" r="6" class="off" style="--i:2"/>
+                <circle cx="100" cy="30" r="6" class="off" style="--i:3"/>
               </g>
-              <path class="walk" d="M38 58 L24 26" />
+              <g class="falling">
+                <ellipse cx="60" cy="40" rx="17" ry="5" class="tabletop"/>
+              </g>
             </svg>
-            <img class="shot" src="modes/gather.webp" alt=""
+            <img class="shot" src="modes/discover.webp" alt=""
                  onerror="this.remove()">
-            <span class="what">Gather</span>
+            <span class="what">Discover</span>
           </button>
 
-          <button class="mode" data-mode="wander" role="radio" aria-checked="false" aria-label="Wander">
+          <button class="mode" data-mode="play" role="radio" aria-checked="false" aria-label="Play">
             <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
-              <g class="dots">
-                <circle cx="22" cy="24" r="6" class="on"/>
-                <circle cx="58" cy="15" r="6" class="on"/>
-                <circle cx="98" cy="28" r="6" class="on"/>
-                <circle cx="82" cy="60" r="6" class="on"/>
-                <circle cx="34" cy="56" r="6" class="on"/>
+              <ellipse cx="60" cy="42" rx="44" ry="22" class="tabletop"/>
+              <g class="rim">
+                <circle cx="22" cy="40" r="4.5" class="on"/>
+                <circle cx="60" cy="22" r="4.5" class="on"/>
+                <circle cx="98" cy="40" r="4.5" class="on"/>
+                <circle cx="60" cy="61" r="4.5" class="on"/>
               </g>
-              <path id="wanderPath" class="route"
-                    d="M14 66 C 36 40, 30 20, 56 30 S 92 58, 110 34" />
-              <circle r="3.5" class="walker">
-                <animateMotion dur="7s" repeatCount="indefinite" rotate="auto">
-                  <mpath href="#wanderPath"/>
-                </animateMotion>
-              </circle>
+              <path id="wireA" class="wire" d="M22 40 L40 33 L52 42"/>
+              <path id="wireB" class="wire" d="M98 40 L80 48"/>
+              <rect x="36" y="29" width="8" height="8" rx="4" class="puck p1"/>
+              <rect x="48" y="38" width="8" height="8" rx="4" class="puck p2"/>
+              <rect x="76" y="44" width="8" height="8" rx="4" class="puck p3"/>
+              <circle r="2" class="packet"><animateMotion dur="1.2s" repeatCount="indefinite"><mpath href="#wireA"/></animateMotion></circle>
+              <circle r="2" class="packet"><animateMotion dur="1.2s" begin="-0.6s" repeatCount="indefinite"><mpath href="#wireB"/></animateMotion></circle>
             </svg>
-            <img class="shot" src="modes/wander.webp" alt=""
+            <img class="shot" src="modes/play.webp" alt=""
                  onerror="this.remove()">
-            <span class="what">Wander</span>
-          </button>
-
-          <button class="mode" data-mode="pulse" role="radio" aria-checked="false" aria-label="Pulse">
-            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
-              <g class="ticks">
-                <path d="M16 70 V74" style="--i:0"/><path d="M42 70 V74" style="--i:1"/>
-                <path d="M68 70 V74" style="--i:2"/><path d="M94 70 V74" style="--i:3"/>
-              </g>
-              <g class="steps">
-                <rect x="10" y="58" width="26" height="4" rx="2" style="--i:0"/>
-                <rect x="44" y="44" width="26" height="4" rx="2" style="--i:1"/>
-                <rect x="78" y="30" width="26" height="4" rx="2" style="--i:2"/>
-              </g>
-              <path id="hopPath" class="hop"
-                    d="M23 58 Q40 30 57 44 Q74 16 91 30" />
-              <circle r="4" class="hopper">
-                <animateMotion dur="2.4s" repeatCount="indefinite">
-                  <mpath href="#hopPath"/>
-                </animateMotion>
-              </circle>
-            </svg>
-            <img class="shot" src="modes/pulse.webp" alt=""
-                 onerror="this.remove()">
-            <span class="what">Pulse</span>
-          </button>
-
-          <button class="mode" data-mode="echo" role="radio" aria-checked="false" aria-label="Echo">
-            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
-              <g class="dots">
-                <circle cx="30" cy="20" r="5" class="on"/>
-                <circle cx="86" cy="18" r="5" class="on"/>
-                <circle cx="96" cy="58" r="5" class="on"/>
-                <circle cx="26" cy="56" r="5" class="on"/>
-              </g>
-              <path id="echoPath" class="route"
-                    d="M28 62 C 12 40, 34 22, 56 34 S 96 24, 100 44 S 64 70, 28 62" />
-              <circle r="3.6" class="walker">
-                <animateMotion dur="6s" repeatCount="indefinite">
-                  <mpath href="#echoPath"/>
-                </animateMotion>
-              </circle>
-              <circle r="3.6" class="ghost">
-                <animateMotion dur="6s" begin="-1.3s" repeatCount="indefinite">
-                  <mpath href="#echoPath"/>
-                </animateMotion>
-              </circle>
-              <circle r="3.6" class="ghost fainter">
-                <animateMotion dur="6s" begin="-2.4s" repeatCount="indefinite">
-                  <mpath href="#echoPath"/>
-                </animateMotion>
-              </circle>
-            </svg>
-            <img class="shot" src="modes/echo.webp" alt=""
-                 onerror="this.remove()">
-            <span class="what">Echo</span>
-          </button>
-
-          <button class="mode" data-mode="blind" role="radio" aria-checked="false" aria-label="Blind">
-            <svg class="thumb" viewBox="0 0 120 76" aria-hidden="true">
-              <g class="dots">
-                <circle cx="26" cy="22" r="6" class="hidden-dot"/>
-                <circle cx="62" cy="14" r="6" class="hidden-dot"/>
-                <circle cx="96" cy="52" r="6" class="hidden-dot"/>
-                <circle cx="34" cy="58" r="6" class="hidden-dot"/>
-              </g>
-              <g class="sonar">
-                <circle cx="74" cy="38" r="7" class="on"/>
-                <circle cx="74" cy="38" r="7" class="ping" style="--d:0s"/>
-                <circle cx="74" cy="38" r="7" class="ping" style="--d:1s"/>
-                <circle cx="74" cy="38" r="7" class="ping" style="--d:2s"/>
-              </g>
-            </svg>
-            <img class="shot" src="modes/blind.webp" alt=""
-                 onerror="this.remove()">
-            <span class="what">Blind</span>
+            <span class="what">Play</span>
           </button>
         </div>
 
         <button id="enter" disabled>Loading…</button>
-        <p class="controls">W A S D walk &middot; mouse look &middot; E take &middot; Q hush &middot; F listen alone &middot; Space jump &middot; R replay &middot; Esc let go</p>
+        <p class="controls">W A S D walk &middot; mouse look &middot; F listen &middot; E take &middot; Enter inside an effect &middot; Esc let go</p>
       </div>
     </div>
 

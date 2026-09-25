@@ -8,6 +8,7 @@
  */
 
 import { Vector3 } from 'three';
+import { Chain } from './fx.js';
 
 const isParam = (x) => x && typeof x === 'object' && 'value' in x;
 
@@ -169,7 +170,10 @@ export class SpatialMix {
         analyser.fftSize = 1024;
         analyser.smoothingTimeConstant = 0.6;
 
-        gain.connect(panner);
+        // gain -> [effects from the table] -> panner: an effect is heard
+        // from where its instrument stands, like the instrument itself.
+        const chain = new Chain(gain, panner);
+        chain.set([]);
         panner.connect(analyser);
         analyser.connect(this.master);
 
@@ -179,6 +183,7 @@ export class SpatialMix {
           buffer,
           gain,
           panner,
+          chain,
           analyser,
           bins: new Uint8Array(analyser.fftSize),
           level: 0,

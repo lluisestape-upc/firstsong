@@ -82,6 +82,7 @@ export class Stage extends EventTarget {
       if (event.code === 'KeyF') this.dispatchEvent(new Event('soloStart'));
       if (event.code === 'Space') this.jump(this.jumpPower());
       if (event.code === 'KeyR') this.dispatchEvent(new Event('replay'));
+      if (event.code === 'Enter') this.dispatchEvent(new Event('inspect'));
     });
     document.addEventListener('keyup', (event) => {
       this.keys.delete(event.code);

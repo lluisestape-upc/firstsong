@@ -157,8 +157,27 @@ export class Interaction {
     return this.byName.get(monument.spec.name);
   }
 
+  /**
+   * Discover starts from silence: every instrument asleep, none spared, and
+   * nothing wakes by being walked past. Each one is heard only when asked for.
+   */
+  sleepAll() {
+    for (const monument of this.monuments) {
+      this.sleeping.add(monument.spec.name);
+      monument.hushed = true;
+      monument.dim = 1;
+      this.mix.setStemMuted(this.stemFor(monument), true, 0.05);
+    }
+    this.onChange('sleep', null);
+  }
+
+  /** Like nearest(), but a sleeping monument counts: it is what F wakes. */
+  nearestAny() {
+    return this.nearest(true);
+  }
+
   /** The monument you are close to and roughly looking at, or null. */
-  nearest() {
+  nearest(includeSleeping = false) {
     const camera = this.stage.camera;
     camera.getWorldDirection(_forward);
     let best = null;
@@ -166,7 +185,7 @@ export class Interaction {
 
     for (const monument of this.monuments) {
       if (monument === this.carrying) continue;
-      if (this.sleeping.has(monument.spec.name)) continue;
+      if (!includeSleeping && this.sleeping.has(monument.spec.name)) continue;
       // Nothing in flight can be caught: let it land first.
       if (monument.homing > 0) continue;
       _toward.copy(monument.group.position).sub(camera.position);
