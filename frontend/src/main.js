@@ -205,31 +205,53 @@ async function boot() {
   const total = monuments.length;
   const found = () => total - interaction.sleeping.size;
 
+  // Steps count from the moment their tutorial starts, not from boot, or a
+  // puck picked up in an earlier visit would tick a step nobody has done yet.
+  const since = { ...seen };
+  const did = (what, times = 1) => seen[what] - since[what] >= times;
+  const markStart = () => Object.assign(since, seen);
+
+  // The table, taught the same way in both modes.
+  const TABLE_STEPS = [
+    { text: 'Point at an effect on the table and press E to pick it up',
+      keys: ['E'], done: () => did('took') },
+    { text: 'Set it down next to one of the little instruments',
+      keys: ['E'], done: () => table.pucks.some((p) => p.on) },
+    { text: 'Point at it and press Enter to go inside the effect',
+      keys: ['Enter'], done: () => did('inspected') },
+    { text: 'W and S change the value, A and D choose another one',
+      keys: ['W', 'S', 'A', 'D'], done: () => did('changed', 2) },
+    { text: 'Hold F to hear only what the effect adds',
+      keys: ['F'], done: () => did('listened') },
+    { text: 'Press Enter to come back out. The table is yours now',
+      keys: ['Enter'], done: () => did('closed') },
+  ];
+
   const tutorial = new Tutorial(dom.tutorial, [
     { text: 'Walk with W A S D and look around with the mouse',
-      keys: ['W', 'A', 'S', 'D'], done: () => seen.walked > 3 },
+      keys: ['W', 'A', 'S', 'D'], done: () => seen.walked - since.walked > 3 },
     { text: 'Walk up to one of the instruments',
       done: () => !!interaction.nearestAny() },
     { text: 'Press F to hear it',
-      keys: ['F'], done: () => seen.discovered > 0 },
+      keys: ['F'], done: () => did('discovered') },
     { text: 'Find the others. Each one you find joins the song',
       keys: ['F'], progress: () => `${found()} of ${total}`,
       done: () => interaction.sleeping.size === 0 },
     { text: 'Something landed in the middle. Go to it',
       done: () => table.inReach },
-    { text: 'Point at an effect on the table and press E to pick it up',
-      keys: ['E'], done: () => seen.took > 0 },
-    { text: 'Set it down next to one of the little instruments',
-      keys: ['E'], done: () => table.pucks.some((p) => p.on) },
-    { text: 'Point at it and press Enter to go inside the effect',
-      keys: ['Enter'], done: () => seen.inspected > 0 },
-    { text: 'W and S change the value, A and D choose another one',
-      keys: ['W', 'S', 'A', 'D'], done: () => seen.changed >= 2 },
-    { text: 'Hold F to hear only what the effect adds',
-      keys: ['F'], done: () => seen.listened > 0 },
-    { text: 'Press Enter to come back out. The table is yours now',
-      keys: ['Enter'], done: () => seen.closed > 0 },
-  ]);
+    ...TABLE_STEPS,
+  ], { key: 'firstsong.tutorial.done', covers: ['firstsong.tutorial.table'], onStart: markStart });
+
+  // Play starts with the whole band and the table already there, so it only
+  // teaches the table, and only to someone who never learned it in Discover.
+  const tableTutorial = new Tutorial(dom.tutorial, [
+    { text: 'The table in the middle is yours. Walk up to it',
+      keys: ['W'], done: () => table.inReach },
+    ...TABLE_STEPS,
+  ], { key: 'firstsong.tutorial.table', onStart: markStart });
+  const TUTORIAL_FOR = { discover: tutorial, play: tableTutorial };
+  const teachingNow = () => tutorial.active || tableTutorial.active;
+
   const TABLE_SIGN = 'set an effect next to an instrument';
   // Read from a few metres away, not twenty like Pulse's signs, so it is
   // hung low and small, just over the table.
@@ -242,14 +264,14 @@ async function boot() {
   };
   // The sign goes up when the table comes down, not before: in Discover there
   // is nothing to explain until there is a table to explain.
-  table.onLanded = pinTableSign;
+  table.onLanded = () => { if (!teachingNow()) pinTableSign(); };
 
   // L: the same song somewhere else. The monuments, the table and the mix
   // stay exactly where they are; only the place around them changes.
   stage.addEventListener('landscape', () => {
     if (!environment.cycle()) return;
     showLandscape();
-    if (!tutorial.active) sky.announce(environment.label, 2.5);
+    if (!teachingNow()) sky.announce(environment.label, 2.5);
   });
 
   stage.addEventListener('replay', () => {
@@ -293,11 +315,12 @@ async function boot() {
     if (mode !== 'blind' && blind.active) blind.active = false;
 
     const fresh = mode !== running || (mode === 'blind' && !blind.active);
-    // The tutorial belongs to Discover: leaving it half-way puts it away
+    // Each tutorial belongs to its mode: leaving it half-way puts it away
     // without counting it as done, so it is there again next time.
-    if (mode !== 'discover') tutorial.stop();
-    // While the tutorial is talking, the sky stays quiet: one voice at a time.
-    const teaching = mode === 'discover' && (tutorial.active || (fresh && !tutorial.seen));
+    const teacher = TUTORIAL_FOR[mode];
+    for (const other of [tutorial, tableTutorial]) if (other !== teacher) other.stop();
+    // While a tutorial is talking, the sky stays quiet: one voice at a time.
+    const teaching = !!teacher && (teacher.active || (fresh && !teacher.seen));
     if (mode !== 'pulse' && !teaching) sky.say(INSTRUCTION[mode]);
 
     running = mode;
@@ -326,7 +349,8 @@ async function boot() {
         interaction.wakeAll();
         interaction.reset();
         table.show();
-        pinTableSign();
+        // The tutorial says what the sign would, so only one of them does.
+        if (!tableTutorial.start()) pinTableSign();
         stage.placeAt(0, 0, 4.4);
         stage.yaw = 0;
         stage.pitch = -0.22;
@@ -511,7 +535,7 @@ async function boot() {
   await renderChooser(world.id);
   window.__firstsong = {
     stage, mix, world, monuments, environment, interaction, trail, pad, sky,
-    blind, beat, course, recorder, words, table, inspector, tutorial, seen,
+    blind, beat, course, recorder, words, table, inspector, tutorial, tableTutorial, seen,
   };
 
   let elapsed = 0;
@@ -553,6 +577,7 @@ async function boot() {
       seen.walked += Math.hypot(stage.velocity.x, stage.velocity.z) * dt;
     }
     tutorial.update(dt);
+    tableTutorial.update(dt);
     beat.update(dt);
     // The course blinks on the beat, which is the only teaching Pulse does.
     if (running === 'pulse') course.update(dt, beat.offsetFrom(mix.songTime()));

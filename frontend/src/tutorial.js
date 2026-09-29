@@ -1,5 +1,5 @@
 /**
- * The first time through Discover, one thing at a time.
+ * The first time through a mode, one thing at a time.
  *
  * Every step waits for you to actually do the thing, never for a timer: the
  * world teaches by being used, and a step that moved on by itself would be
@@ -8,26 +8,32 @@
  *
  * Finishing it (or pressing H) is remembered in this browser, so the second
  * visit is left alone. The piece still works if storage is refused.
+ *
+ * There can be more than one. Discover teaches everything; Play only the
+ * table. Finishing Discover also counts as having learned the table (`covers`),
+ * so a Discover graduate is never taught it twice.
  */
 
-const STORE_KEY = 'firstsong.tutorial.done';
-
-function remembered() {
-  try { return localStorage.getItem(STORE_KEY) === '1'; } catch { return false; }
+function remembered(key) {
+  try { return localStorage.getItem(key) === '1'; } catch { return false; }
 }
 
-function remember() {
-  try { localStorage.setItem(STORE_KEY, '1'); } catch { /* private window */ }
+function remember(key) {
+  try { localStorage.setItem(key, '1'); } catch { /* private window */ }
 }
 
 export class Tutorial {
   /**
    * `steps` is a list of { text, keys, done(), progress?() }. `done` is asked
    * every frame; `progress` may return a short "2 of 4" for steps that repeat.
+   * `onStart` runs each time it begins, so the steps can count from there.
    */
-  constructor(root, steps) {
+  constructor(root, steps, { key = 'firstsong.tutorial.done', covers = [], onStart = () => {} } = {}) {
     this.root = root;
     this.steps = steps;
+    this.key = key;
+    this.covers = covers;
+    this.onStart = onStart;
     this.index = -1;
     this.active = false;
     this.hold = 0;           // a beat of acknowledgement before the next step
@@ -43,12 +49,14 @@ export class Tutorial {
   }
 
   get seen() {
-    return remembered();
+    return remembered(this.key);
   }
 
   start(force = false) {
-    if (!force && remembered()) return false;
+    if (!force && this.seen) return false;
+    this.onStart();
     this.active = true;
+    this.hold = 0;
     this.index = -1;
     this.dotsEl.innerHTML = this.steps.map(() => '<i></i>').join('');
     this.root.classList.remove('hidden');
@@ -58,7 +66,7 @@ export class Tutorial {
 
   finish() {
     this.active = false;
-    remember();
+    for (const key of [this.key, ...this.covers]) remember(key);
     this.root.classList.add('hidden');
   }
 

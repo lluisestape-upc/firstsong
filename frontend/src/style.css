@@ -438,7 +438,9 @@ h1 {
 }
 .tutorial.hidden,
 .tutorial.away { opacity: 0; }
-.tutorial.arrive { animation: step-in 0.45s ease both; }
+/* Only while shown: the animation's fill would otherwise hold a finished or
+   put-away card at full opacity. */
+.tutorial.arrive:not(.hidden):not(.away) { animation: step-in 0.45s ease both; }
 .tutorial.ticked { border-color: #a8f0c6; }
 
 @keyframes step-in {
