@@ -32,6 +32,9 @@ function textPlane(text, { size = 88, width = 2048, opacity = 0.5, italic = fals
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#ffffff';
+  // A soft shadow so the words still read against a bright daytime sky.
+  ctx.shadowColor = 'rgba(20, 24, 40, 0.7)';
+  ctx.shadowBlur = size * 0.35;
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
   const texture = new THREE.CanvasTexture(canvas);

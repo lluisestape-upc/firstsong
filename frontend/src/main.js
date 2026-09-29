@@ -54,6 +54,8 @@ async function renderChooser(currentId) {
   }
 }
 
+const STAND_HEIGHT = 0.15;      // metres between an instrument's feet and the ground
+
 // Discover and Play are the two on the menu. The rest are still here, reached
 // with ?mode=, while it is decided whether they come back.
 const MODES = ['discover', 'play', 'lyrics', 'gather', 'wander', 'pulse', 'echo', 'blind'];
@@ -134,7 +136,18 @@ async function boot() {
     `${world.mix.tempo} BPM · key ${world.mix.key} · ${world.stems.length} stems · ` +
     `${world.environment.provider}`;
 
-  const environment = await buildEnvironment(stage.scene, world.environment, base);
+  const environment = await buildEnvironment(stage, world.environment, base, world.mix, world.id);
+  const metaLine = dom.meta.textContent;
+  const showLandscape = () => {
+    if (environment.label) dom.meta.textContent = `${metaLine} · ${environment.label}`;
+  };
+  showLandscape();
+
+  // The pipeline hangs each instrument at its own height, which read as
+  // floating lanterns against the old dark sky. In daylight, with a shadow
+  // on the ground below, a drum kit three metres up is just wrong: stand
+  // them all on the grass, with a breath of air under their feet.
+  for (const spec of world.stems) spec.position[1] = STAND_HEIGHT;
 
   const monuments = await Promise.all(
     world.stems.map((spec) => buildMonument(spec, base))
@@ -175,6 +188,7 @@ async function boot() {
   const table = new Table({
     scene: stage.scene, stage, mix, monuments, bpm: world.mix.tempo,
   });
+  table.group.traverse((node) => { if (node.isMesh) node.castShadow = true; });
   const inspector = new Inspector({ stage, table, mix });
 
   // What the player has actually done, counted, so each tutorial step can
@@ -229,6 +243,14 @@ async function boot() {
   // The sign goes up when the table comes down, not before: in Discover there
   // is nothing to explain until there is a table to explain.
   table.onLanded = pinTableSign;
+
+  // L: the same song somewhere else. The monuments, the table and the mix
+  // stay exactly where they are; only the place around them changes.
+  stage.addEventListener('landscape', () => {
+    if (!environment.cycle()) return;
+    showLandscape();
+    if (!tutorial.active) sky.announce(environment.label, 2.5);
+  });
 
   stage.addEventListener('replay', () => {
     if (recorder.playing) { recorder.stop(); return; }
@@ -544,6 +566,11 @@ async function boot() {
       sky.say('press R to walk it again', 8);
     }
     sky.update(dt);
+    const energy = mix.playing
+      ? Math.min(1, 1.8 * mix.stems.reduce((sum, s) => sum + (s.muted ? 0 : s.level), 0)
+        / Math.max(1, mix.stems.length))
+      : 0;
+    environment.update(dt, stage.camera, energy);
     // One discovery at a time: while the song is still being assembled, the
     // sky says nothing about carrying.
 

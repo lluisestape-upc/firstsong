@@ -7,6 +7,10 @@
  * movement maths is identical in both modes.
  */
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 const WALK_SPEED = 9.0;
 const DAMPING = 8.0;
@@ -35,12 +39,24 @@ export class Stage extends EventTarget {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(
       68, window.innerWidth / window.innerHeight, 0.1, 1000
     );
     this.camera.position.set(0, EYE_HEIGHT, 0);
+
+    // Bloom on the bright things only: the sun, lit pucks, fireflies. The
+    // landscape sets how much, and the song's loudness moves it a little.
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.3, 0.55, 0.88
+    );
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
 
     this.yaw = 0;
     this.pitch = 0;
@@ -83,6 +99,7 @@ export class Stage extends EventTarget {
       if (event.code === 'Space') this.jump(this.jumpPower());
       if (event.code === 'KeyR') this.dispatchEvent(new Event('replay'));
       if (event.code === 'Enter') this.dispatchEvent(new Event('inspect'));
+      if (event.code === 'KeyL') this.dispatchEvent(new Event('landscape'));
     });
     document.addEventListener('keyup', (event) => {
       this.keys.delete(event.code);
@@ -178,6 +195,11 @@ export class Stage extends EventTarget {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  setBloom(strength) {
+    this.bloom.strength = strength;
   }
 
   step(dt) {
@@ -252,6 +274,6 @@ export class Stage extends EventTarget {
   }
 
   render() {
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   }
 }

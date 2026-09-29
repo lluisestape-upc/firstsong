@@ -27,6 +27,14 @@ def _hex(h: float, s: float, v: float) -> str:
     return "#{:02x}{:02x}{:02x}".format(int(r * 255), int(g * 255), int(b * 255))
 
 
+def _biome(key: str, tempo: float) -> str:
+    """Which landscape the song stands in. Mirrors chooseBiome() in environment.js."""
+    if tempo < 90:
+        return "shore"
+    index = PITCH_CLASSES.index(key) if key in PITCH_CLASSES else 0
+    return ["meadow", "blossom", "snow", "night"][index % 4]
+
+
 def _procedural(mix: dict, title: str) -> dict:
     key = mix.get("key", "C")
     brightness = mix.get("brightness", 0.5)
@@ -44,6 +52,7 @@ def _procedural(mix: dict, title: str) -> dict:
         "fog_density": round(haze, 4),
         "ground_color": _hex(base_hue + 0.08, 0.22, 0.14 + brightness * 0.18),
         "ground_radius": 90,
+        "biome": _biome(key, tempo),
         "note": f"palette derived from key {key} at {tempo} BPM",
     }
 
