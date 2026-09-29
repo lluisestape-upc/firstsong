@@ -502,4 +502,83 @@ kbd {
 
 /* Trailer mode (T): the world and nothing else. */
 body.cinematic #hud,
+body.cinematic #missions,
 body.cinematic #tutorial { display: none; }
+
+/* --------------------------------------------------------------- missions */
+
+/* Top right, out of the way of the tutorial (bottom centre) and the HUD
+   (bottom left): a job to do, and the stars earned so far. */
+.missions {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: min(330px, calc(100vw - 32px));
+  padding: 12px 16px 13px;
+  background: var(--panel);
+  border: 1px solid var(--edge-strong);
+  border-radius: 14px;
+  transition: opacity 0.3s ease, border-color 0.3s ease;
+  pointer-events: none;
+}
+.missions.hidden { opacity: 0; }
+.missions.arrive:not(.hidden) { animation: mission-in 0.45s ease both; }
+.missions.learned { border-color: #ffd86b; }
+
+@keyframes mission-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.missions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.missions-stars { display: inline-flex; align-items: center; gap: 2px; }
+.missions-stars i {
+  font-style: normal;
+  font-size: 13px;
+  color: rgba(242, 240, 234, 0.2);
+}
+.missions-stars i.got { color: #ffd86b; }
+.missions-stars i.new { animation: star-pop 0.6s ease; }
+.missions-stars span {
+  margin-left: 6px;
+  color: var(--muted);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes star-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.9); }
+  100% { transform: scale(1); }
+}
+
+.missions-text {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.missions.learned .missions-text { color: #ffe9a8; font-style: italic; margin-bottom: 0; }
+
+.missions-keys {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.missions-keys:empty { display: none; }
+.missions-skip { margin-left: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .missions.arrive, .missions-stars i { animation: none !important; }
+}

@@ -14,6 +14,7 @@ import { Words } from './words.js';
 import { Table, TABLE_HEIGHT } from './table.js';
 import { Inspector } from './inspect.js';
 import { Tutorial } from './tutorial.js';
+import { Missions } from './missions.js';
 import { cacheUrl, getWorld, listWorlds, resolveWorldId } from './api.js';
 
 const dom = {
@@ -28,6 +29,7 @@ const dom = {
   meta: document.getElementById('meta'),
   controls: document.querySelector('.controls'),
   tutorial: document.getElementById('tutorial'),
+  missions: document.getElementById('missions'),
 };
 
 /** Offer the other worlds, if there is more than one. Switching reloads. */
@@ -269,6 +271,60 @@ async function boot() {
     ...INSTRUMENT_STEPS,
   ], { key: 'firstsong.tutorial.table', onStart: markStart });
   const TUTORIAL_FOR = { discover: tutorial, play: tableTutorial };
+
+  // Missions: jobs a producer would do, each checked against the real mix.
+  // Only the ones this song's instruments allow are offered.
+  const monumentNamed = (name) => monuments.find((m) => m.spec.name === name);
+  const effectOn = (name, kind) => {
+    const token = table.tokens.find((t) => t.monument.spec.name === name);
+    return (token && table.pucks.find((p) => p.kind === kind && p.on === token)) || null;
+  };
+  const value = (puck, name) => (puck ? puck.effect.values[name] : null);
+  const RHYTHM = ['drums', 'bass'];
+  const missions = new Missions(dom.missions, [
+    { id: 'solo-drums', needs: ['drums'],
+      text: 'Hear only the drums: hold F next to them',
+      keys: ['F'], check: () => interaction.soloing?.spec.name === 'drums',
+      lesson: 'That is a stem: one instrument on its own. A song is a few of them played together.' },
+    { id: 'the-beat', needs: RHYTHM,
+      text: 'Leave only the beat: silence everything except the drums and the bass',
+      keys: ['Q'],
+      check: () => monuments.every((m) => (RHYTHM.includes(m.spec.name) ? !m.hushed : m.hushed)),
+      lesson: 'Drums and bass are the rhythm section. Most songs are built on top of them.' },
+    { id: 'cathedral', needs: ['vocals'],
+      text: 'Put the singer in a cathedral: Reverb on the voice, decay over 4 seconds',
+      keys: ['E', 'Enter'], check: () => value(effectOn('vocals', 'reverb'), 'decay') >= 4,
+      lesson: 'Reverb is the room. A long decay is a big room: a church, a cave, a stadium.' },
+    { id: 'echo', needs: ['vocals'],
+      text: 'Make the singer echo on and on: Delay on the voice, feedback over 60%',
+      keys: ['E', 'Enter'], check: () => value(effectOn('vocals', 'delay'), 'feedback') >= 0.6,
+      lesson: 'Feedback sends every echo back in, so it repeats again, a little quieter each time.' },
+    { id: 'next-door', needs: ['drums'],
+      text: 'Make the drums sound like they are in the room next door: Filter on the drums, below 400 Hz',
+      keys: ['E', 'Enter'],
+      check: () => {
+        const puck = effectOn('drums', 'filter');
+        return value(puck, 'type') === 'lowpass' && value(puck, 'cutoff') <= 400;
+      },
+      lesson: 'Walls stop the high frequencies first. A lowpass filter does the same thing.' },
+    { id: 'growl', needs: ['bass'],
+      text: 'Make the bass growl: Distortion on the bass, drive over 20x',
+      keys: ['E', 'Enter'], check: () => value(effectOn('bass', 'drive'), 'drive') >= 20,
+      lesson: 'Distortion adds harmonics the bass never played. That is why a dirty bass cuts through.' },
+    { id: 'chain', needs: [],
+      text: 'Chain two effects on the same instrument',
+      keys: ['E'],
+      check: () => table.tokens.some((t) => table.pucks.filter((p) => p.on === t).length >= 2),
+      lesson: 'Order matters: the second effect works on whatever the first one made.' },
+    { id: 'far', needs: [],
+      text: 'Carry an instrument far away, more than 25 metres from the table',
+      keys: ['E'],
+      check: () => monuments.some((m) => !m.carried
+        && Math.hypot(m.group.position.x, m.group.position.z) > 25),
+      lesson: 'Far away is quieter and further into the room. Mixing is deciding where everything stands.' },
+  ].filter((m) => m.needs.every((name) => monumentNamed(name))),
+  { key: `unwrapped.stars.${world.id}`, ctx: mix.ctx });
+  stage.addEventListener('mission', () => missions.skip());
   const teachingNow = () => tutorial.active || tableTutorial.active;
 
   const TABLE_SIGN = 'set an effect next to an instrument';
@@ -575,7 +631,7 @@ async function boot() {
   await renderChooser(world.id);
   window.__firstsong = {
     stage, mix, world, monuments, environment, interaction, trail, pad, sky,
-    blind, beat, course, recorder, words, table, inspector, tutorial, tableTutorial, seen,
+    blind, beat, course, recorder, words, table, inspector, tutorial, tableTutorial, missions, seen,
   };
 
   let elapsed = 0;
@@ -618,6 +674,10 @@ async function boot() {
     }
     tutorial.update(dt);
     tableTutorial.update(dt);
+    // Missions once there is a table to do them at and nobody is teaching.
+    const missionTime = TABLE_MODES.has(running) && table.landed && !teachingNow();
+    if (missionTime !== missions.active) missions.show(missionTime);
+    missions.update(dt);
     beat.update(dt);
     // The course blinks on the beat, which is the only teaching Pulse does.
     if (running === 'pulse') course.update(dt, beat.offsetFrom(mix.songTime()));

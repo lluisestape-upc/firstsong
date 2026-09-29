@@ -41,4 +41,4 @@ rm -rf .git
 
 echo
 echo "==> done"
-echo "    https://lluisestape-upc.github.io/firstsong/"
+echo "    https://lluisestape-upc.github.io/unwrapped/"
