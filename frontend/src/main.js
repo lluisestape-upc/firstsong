@@ -195,6 +195,7 @@ async function boot() {
   // wait for the real thing rather than for a timer.
   const seen = {
     walked: 0, discovered: 0, took: 0, inspected: 0, changed: 0, listened: 0, closed: 0,
+    carried: 0, moved: 0, hushed: 0, unhushed: 0, soloed: 0,
   };
   inspector.onEvent = (what) => {
     if (what === 'open') seen.inspected++;
@@ -223,8 +224,22 @@ async function boot() {
       keys: ['W', 'S', 'A', 'D'], done: () => did('changed', 2) },
     { text: 'Hold F to hear only what the effect adds',
       keys: ['F'], done: () => did('listened') },
-    { text: 'Press Enter to come back out. The table is yours now',
+    { text: 'Press Enter to come back out',
       keys: ['Enter'], done: () => did('closed') },
+  ];
+
+  // The instruments themselves: where they stand, and whether they play.
+  const INSTRUMENT_STEPS = [
+    { text: 'The instruments move too. Look at one and press E to pick it up',
+      keys: ['E'], done: () => did('carried') },
+    { text: 'Walk somewhere else and press E to set it down. You hear it from where it stands',
+      keys: ['E'], done: () => did('moved') },
+    { text: 'Look at an instrument and press Q to silence it',
+      keys: ['Q'], done: () => did('hushed') },
+    { text: 'Press Q again to bring it back',
+      keys: ['Q'], done: () => did('unhushed') },
+    { text: 'Hold F next to an instrument to hear it on its own. The world is yours now',
+      keys: ['F'], done: () => did('soloed') },
   ];
 
   const tutorial = new Tutorial(dom.tutorial, [
@@ -240,14 +255,16 @@ async function boot() {
     { text: 'Something landed in the middle. Go to it',
       done: () => table.inReach },
     ...TABLE_STEPS,
+    ...INSTRUMENT_STEPS,
   ], { key: 'firstsong.tutorial.done', covers: ['firstsong.tutorial.table'], onStart: markStart });
 
-  // Play starts with the whole band and the table already there, so it only
-  // teaches the table, and only to someone who never learned it in Discover.
+  // Play starts with the whole band and the table already there, so it skips
+  // finding them and teaches the rest, only to someone who never did Discover.
   const tableTutorial = new Tutorial(dom.tutorial, [
     { text: 'The table in the middle is yours. Walk up to it',
       keys: ['W'], done: () => table.inReach },
     ...TABLE_STEPS,
+    ...INSTRUMENT_STEPS,
   ], { key: 'firstsong.tutorial.table', onStart: markStart });
   const TUTORIAL_FOR = { discover: tutorial, play: tableTutorial };
   const teachingNow = () => tutorial.active || tableTutorial.active;
@@ -409,6 +426,11 @@ async function boot() {
 
   // The sky acknowledges the song coming back together, then gets out of the way.
   interaction.onChange = (what) => {
+    if (what === 'take') seen.carried++;
+    if (what === 'place') seen.moved++;
+    if (what === 'hush') seen.hushed++;
+    if (what === 'wake') seen.unhushed++;
+    if (what === 'solo') seen.soloed++;
     // Waking the first one proves the instruction landed.
     if (what === 'discovered') sky.dismiss();
     if (what === 'discovered' || what === 'assembled') seen.discovered++;

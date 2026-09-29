@@ -9,9 +9,9 @@
  * Finishing it (or pressing H) is remembered in this browser, so the second
  * visit is left alone. The piece still works if storage is refused.
  *
- * There can be more than one. Discover teaches everything; Play only the
- * table. Finishing Discover also counts as having learned the table (`covers`),
- * so a Discover graduate is never taught it twice.
+ * There can be more than one. Discover teaches everything; Play skips the
+ * finding. Finishing Discover also counts for Play (`covers`), so a Discover
+ * graduate is never taught it twice.
  */
 
 function remembered(key) {

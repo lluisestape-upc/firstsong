@@ -213,6 +213,7 @@ export class Interaction {
 
     this.carrying = target;
     target.carried = true;
+    target.standY = target.baseY;
     this.onChange('take', target);
     return target;
   }
@@ -223,7 +224,8 @@ export class Interaction {
 
     const p = monument.group.position;
     monument.carried = false;
-    monument.setPosition(p.x, Math.max(0.6, p.y), p.z);
+    // Back down at the height it stood at before it was lifted.
+    monument.setPosition(p.x, monument.standY ?? Math.max(0.6, p.y), p.z);
     monument.spec.position = [p.x, monument.baseY, p.z];
     this.mix.setStemPosition(this.stemFor(monument), p.x, monument.baseY, p.z);
 
