@@ -18,6 +18,7 @@ import * as THREE from 'three';
 const AHEAD = 26;               // how far in front a written line stands
 const INSTRUCTION_HEIGHT = 9.5; // about twenty degrees up at that distance
 const ANNOUNCE_HEIGHT = 6.5;
+const TITLE_HEIGHT = 20;        // high enough that you have to look up for it
 
 const _ahead = new THREE.Vector3();
 
@@ -64,6 +65,8 @@ export class SkyText {
     this.announcement = null;
     this.announceUntil = 0;
     this.sign = null;
+    this.titleMesh = null;
+    this.quiet = false;          // the trailer: nothing written but the title
     this.elapsed = 0;
     scene.add(this.group);
   }
@@ -139,6 +142,28 @@ export class SkyText {
     this.announceUntil = this.elapsed + seconds;
   }
 
+  /**
+   * The trailer's last shot. The name is written high in the sky ahead of
+   * where you are looking, and only fades in once you tilt up to it, so the
+   * reveal is a camera move and needs no editing afterwards.
+   */
+  title(text) {
+    this.untitle();
+    this.titleMesh = textPlane(text, { size: 230, opacity: 0 });
+    this.titleMesh.scale.setScalar(1.9);
+    const at = this._ahead(TITLE_HEIGHT);
+    this.titleMesh.position.set(at.x, at.y, at.z);
+    // Faces the reader fully, tilted down to them, not just turned to them.
+    this.titleMesh.lookAt(this.camera.position);
+    this.group.add(this.titleMesh);
+  }
+
+  untitle() {
+    if (!this.titleMesh) return;
+    this.group.remove(this.titleMesh);
+    this.titleMesh = null;
+  }
+
   /** Only opacity changes here. Nothing written ever moves. */
   update(dt) {
     this.elapsed += dt;
@@ -151,18 +176,25 @@ export class SkyText {
     };
 
     if (this.instruction
-        && !fade(this.instruction, this.elapsed < this.instructionUntil, 0.5)) {
+        && !fade(this.instruction, !this.quiet && this.elapsed < this.instructionUntil, 0.5)) {
       this.group.remove(this.instruction);
       this.instruction = null;
     }
 
     if (this.announcement
-        && !fade(this.announcement, this.elapsed < this.announceUntil, 0.48)) {
+        && !fade(this.announcement, !this.quiet && this.elapsed < this.announceUntil, 0.48)) {
       this.group.remove(this.announcement);
       this.announcement = null;
     }
 
     // A sign has no timer: it fades up once and then simply is there.
-    if (this.sign) fade(this.sign, true, 0.46);
+    if (this.sign) fade(this.sign, !this.quiet, 0.46);
+
+    if (this.titleMesh) {
+      this.camera.getWorldDirection(_ahead);
+      const pitch = Math.asin(Math.max(-1, Math.min(1, _ahead.y)));
+      const t = Math.min(1, Math.max(0, (pitch - 0.3) / 0.3));
+      fade(this.titleMesh, t > 0, 0.95 * t * t * (3 - 2 * t));
+    }
   }
 }

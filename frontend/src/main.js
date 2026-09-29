@@ -300,6 +300,15 @@ async function boot() {
     if (!teachingNow()) sky.announce(environment.label, 2.5);
   });
 
+  // T: trailer mode. Every overlay and every written line goes away, and the
+  // name is written in the sky ahead, waiting for the camera to look up.
+  stage.addEventListener('trailer', () => {
+    const on = document.body.classList.toggle('cinematic');
+    sky.quiet = on;
+    if (on) sky.title('Unwrapped');
+    else sky.untitle();
+  });
+
   stage.addEventListener('replay', () => {
     if (recorder.playing) { recorder.stop(); return; }
     if (!recorder.play()) return;

@@ -100,6 +100,7 @@ export class Stage extends EventTarget {
       if (event.code === 'KeyR') this.dispatchEvent(new Event('replay'));
       if (event.code === 'Enter') this.dispatchEvent(new Event('inspect'));
       if (event.code === 'KeyL') this.dispatchEvent(new Event('landscape'));
+      if (event.code === 'KeyT') this.dispatchEvent(new Event('trailer'));
     });
     document.addEventListener('keyup', (event) => {
       this.keys.delete(event.code);

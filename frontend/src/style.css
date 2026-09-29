@@ -499,3 +499,7 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .tutorial.arrive { animation: none; }
 }
+
+/* Trailer mode (T): the world and nothing else. */
+body.cinematic #hud,
+body.cinematic #tutorial { display: none; }
