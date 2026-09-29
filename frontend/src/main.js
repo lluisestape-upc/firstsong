@@ -195,7 +195,7 @@ async function boot() {
   // wait for the real thing rather than for a timer.
   const seen = {
     walked: 0, discovered: 0, took: 0, inspected: 0, changed: 0, listened: 0, closed: 0,
-    carried: 0, moved: 0, hushed: 0, unhushed: 0, soloed: 0,
+    carried: 0, moved: 0, hushed: 0, unhushed: 0, soloed: 0, reset: 0,
   };
   inspector.onEvent = (what) => {
     if (what === 'open') seen.inspected++;
@@ -238,8 +238,10 @@ async function boot() {
       keys: ['Q'], done: () => did('hushed') },
     { text: 'Press Q again to bring it back',
       keys: ['Q'], done: () => did('unhushed') },
-    { text: 'Hold F next to an instrument to hear it on its own. The world is yours now',
+    { text: 'Hold F next to an instrument to hear it on its own',
       keys: ['F'], done: () => did('soloed') },
+    { text: 'The red button in the middle of the table puts everything back. Press E on it',
+      keys: ['E'], done: () => did('reset') },
   ];
 
   const tutorial = new Tutorial(dom.tutorial, [
@@ -278,6 +280,13 @@ async function boot() {
   table.onChange = (what) => {
     if (inspector.active) inspector.draw();
     if (what === 'take') { sky.dismiss(); seen.took++; }
+    // The table resets itself; the instruments are sent home from here,
+    // flying back along their arcs as the pad used to do.
+    if (what === 'reset') {
+      seen.reset++;
+      interaction.reset();
+      if (!teachingNow()) sky.announce('back to how it was', 2.5);
+    }
   };
   // The sign goes up when the table comes down, not before: in Discover there
   // is nothing to explain until there is a table to explain.

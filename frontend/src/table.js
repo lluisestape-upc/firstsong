@@ -11,6 +11,8 @@
  *   effects      pucks you pick up and set down. Put one next to an
  *                instrument and it is on that instrument; put another next
  *                to the first and it goes after it in the chain.
+ *   the button   red, in the middle, with the pucks parked around it. Press
+ *                it and everything goes home: pucks, settings, instruments.
  *
  * The drawing is the signal flow: a line from the instrument through each
  * effect in order, with a pulse travelling along it on the beat.
@@ -26,6 +28,8 @@ const PUCK_RADIUS = 0.12;
 const REACH = 3.6;          // how close you must stand to use the table
 const FALL_FROM = 38;
 const FALL_SECONDS = 1.5;
+const BUTTON_RADIUS = 0.1;
+const PARK = 0.3;           // where the pucks wait, around the button
 
 const _ray = new THREE.Raycaster();
 const _centre = new THREE.Vector2(0, 0);
@@ -188,6 +192,23 @@ export class Table {
     this.shock.position.y = 0.06;
     this.group.add(this.shock);
     this.shockLife = 0;
+
+    // The reset: a big red button, because everyone knows what one does.
+    const collar = new THREE.Mesh(
+      new THREE.CylinderGeometry(BUTTON_RADIUS * 1.35, BUTTON_RADIUS * 1.45, 0.03, 40),
+      new THREE.MeshStandardMaterial({ color: '#2a2d36', roughness: 0.4, metalness: 0.5 })
+    );
+    collar.position.y = TABLE_HEIGHT + 0.015;
+    const cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(BUTTON_RADIUS, BUTTON_RADIUS * 1.05, 0.05, 40),
+      new THREE.MeshStandardMaterial({
+        color: '#d4202a', roughness: 0.35, emissive: '#ff2a2a', emissiveIntensity: 0.4,
+      })
+    );
+    this.button = { collar, cap, rest: TABLE_HEIGHT + 0.045, press: 0, flash: 0 };
+    cap.position.y = this.button.rest;
+    this.group.add(collar, cap);
+    this.aimedButton = false;
   }
 
   _buildTokens(monuments) {
@@ -266,11 +287,12 @@ export class Table {
       // Parked in the middle, clear of every instrument: nothing is on
       // anything until somebody puts it there.
       const angle = Math.PI / 4 + (i * Math.PI) / 2;
-      const pos = new THREE.Vector2(Math.cos(angle) * 0.3, Math.sin(angle) * 0.3);
+      const home = new THREE.Vector2(Math.cos(angle) * PARK, Math.sin(angle) * PARK);
       return {
-        kind, spec, holder, base, halo, pos,
+        kind, spec, holder, base, halo, home, pos: home.clone(),
         effect: new Effect(this.mix.ctx, kind, this.bpm),
         lift: 0,
+        homing: false,
         on: null,              // the token this puck's chain belongs to
       };
     });
@@ -320,7 +342,7 @@ export class Table {
     this.group.visible = false;
     this.carrying = null;
     // Nothing on the table means nothing on any instrument.
-    for (const puck of this.pucks) puck.pos.set(puck.pos.x * 0.3, puck.pos.y * 0.3);
+    for (const puck of this.pucks) { puck.pos.copy(puck.home); puck.homing = false; }
     rewire(this.tokens.filter((t) => t.stem).map((t) => [t.stem.chain, []]));
   }
 
@@ -340,6 +362,7 @@ export class Table {
   _aim() {
     this.aimPoint = null;
     this.aimed = null;
+    this.aimedButton = false;
     const camera = this.stage.camera;
     this.inReach = this.landed && Math.hypot(camera.position.x, camera.position.z) < REACH;
     if (!this.inReach) return;
@@ -356,6 +379,10 @@ export class Table {
     const scale = Math.min(1, (TABLE_RADIUS - PUCK_RADIUS) / Math.max(r, 1e-6));
     this.aimPoint = new THREE.Vector2(_hit.x * scale, _hit.z * scale);
     if (this.carrying) return;
+    if (this.aimPoint.length() < BUTTON_RADIUS * 1.4) {
+      this.aimedButton = true;
+      return;
+    }
 
     let best = null;
     let bestD = PUCK_RADIUS * 1.8;
@@ -371,8 +398,19 @@ export class Table {
     if (!this.landed || !this.inReach) return false;
     if (this.carrying) {
       if (this.aimPoint) this.carrying.pos.copy(this.aimPoint);
+      // Never on top of the button: slide it just clear.
+      const clear = BUTTON_RADIUS * 1.45 + PUCK_RADIUS;
+      const r = this.carrying.pos.length();
+      if (r < clear) {
+        if (r < 1e-3) this.carrying.pos.set(0, clear);
+        else this.carrying.pos.multiplyScalar(clear / r);
+      }
       this.carrying = null;
       this.onChange('place');
+      return true;
+    }
+    if (this.aimedButton) {
+      this.reset();
       return true;
     }
     if (this.aimed) {
@@ -381,6 +419,22 @@ export class Table {
       return true;
     }
     return false;
+  }
+
+  /**
+   * The red button. Every puck floats back to its place around it and every
+   * setting goes back to where it started. The instruments are the world's
+   * business, so the caller sends those home (onChange 'reset').
+   */
+  reset() {
+    this.carrying = null;
+    for (const puck of this.pucks) {
+      puck.homing = true;
+      for (const [name, p] of Object.entries(puck.spec.params)) puck.effect.set(name, p.value);
+    }
+    this.button.press = 1;
+    this.button.flash = 1;
+    this.onChange('reset');
   }
 
   /** Which effects are on which instrument, in what order. */
@@ -448,8 +502,23 @@ export class Table {
 
     const chains = this._graph();
 
+    const button = this.button;
+    button.press = Math.max(0, button.press - dt * 3);
+    button.flash = Math.max(0, button.flash - dt * 1.5);
+    button.cap.position.y = button.rest - Math.sin(Math.min(1, button.press) * Math.PI) * 0.03;
+    button.cap.material.emissiveIntensity = 0.4 + (this.aimedButton ? 0.6 : 0) + button.flash * 2.5;
+    button.cap.scale.setScalar(this.aimedButton ? 1.08 : 1);
+
     for (const puck of this.pucks) {
-      const lifted = puck === this.carrying ? 1 : 0;
+      if (puck.homing) {
+        puck.pos.lerp(puck.home, Math.min(1, dt * 5));
+        if (puck.pos.distanceTo(puck.home) < 0.004) {
+          puck.pos.copy(puck.home);
+          puck.homing = false;
+        }
+      }
+      // Lifted while carried, and while flying home, so the way back is an arc.
+      const lifted = puck === this.carrying || puck.homing ? 1 : 0;
       puck.lift += (lifted - puck.lift) * Math.min(1, dt * 12);
       puck.holder.position.set(puck.pos.x, TABLE_HEIGHT + puck.lift * 0.12, puck.pos.y);
       const aimed = puck === this.aimed || puck === this.carrying;
