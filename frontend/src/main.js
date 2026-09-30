@@ -380,6 +380,23 @@ async function boot() {
   // rather than starting it over. Picking a different mode does restart.
   let running = null;
   let echoNudged = false;
+  // Set by H: the next start of Discover or Play teaches again, even to a
+  // browser that remembers having finished the tutorial.
+  let teachAgain = false;
+
+  document.addEventListener('keydown', (event) => {
+    if (event.code !== 'KeyH' || event.defaultPrevented) return;
+    if (!stage.active || inspector.active) return;
+    const teacher = TUTORIAL_FOR[running];
+    if (!teacher || teacher.active) return;
+    // Start the mode over, so every step begins from the state it teaches.
+    const mode = running;
+    table.hide();
+    running = null;
+    teachAgain = true;
+    sky.dismiss();
+    startMode(mode);
+  });
 
   function startMode(mode) {
     // Pulse is the one mode where walking up to a sleeping shape does nothing:
@@ -411,7 +428,7 @@ async function boot() {
     const teacher = TUTORIAL_FOR[mode];
     for (const other of [tutorial, tableTutorial]) if (other !== teacher) other.stop();
     // While a tutorial is talking, the sky stays quiet: one voice at a time.
-    const teaching = !!teacher && (teacher.active || (fresh && !teacher.seen));
+    const teaching = !!teacher && (teacher.active || teachAgain || (fresh && !teacher.seen));
     if (mode !== 'pulse' && !teaching) sky.say(INSTRUCTION[mode]);
 
     running = mode;
@@ -426,7 +443,8 @@ async function boot() {
         interaction.sleepAll();
         table.hide();
         stage.placeAt(0, 0, 0);
-        tutorial.start();
+        tutorial.start(teachAgain);
+        teachAgain = false;
         break;
       case 'lyrics':
         // The song from the top, the whole band, and a world that starts
@@ -441,7 +459,8 @@ async function boot() {
         interaction.reset();
         table.show();
         // The tutorial says what the sign would, so only one of them does.
-        if (!tableTutorial.start()) pinTableSign();
+        if (!tableTutorial.start(teachAgain)) pinTableSign();
+        teachAgain = false;
         stage.placeAt(0, 0, 4.4);
         stage.yaw = 0;
         stage.pitch = -0.22;

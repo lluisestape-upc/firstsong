@@ -44,7 +44,11 @@ export class Tutorial {
     this.dotsEl = root.querySelector('.tutorial-dots');
 
     document.addEventListener('keydown', (event) => {
-      if (this.active && event.code === 'KeyH') this.finish();
+      if (this.active && event.code === 'KeyH') {
+        this.finish();
+        // Handled: the same press must not start it again (H replays it).
+        event.preventDefault();
+      }
     });
   }
 
