@@ -18,7 +18,17 @@ const EYE_HEIGHT = 1.7;
 const WORLD_LIMIT = 70;
 const JUMP_SPEED = 5.2;
 const GRAVITY = 14.0;
-const LOOK_SENSITIVITY = 0.0023;
+// Radians per pixel of mouse travel. Raw input (no OS acceleration) makes
+// this the same on every machine; - and = scale it for a particular mouse.
+const LOOK_SENSITIVITY = 0.0012;
+const SENSITIVITY_KEY = 'unwrapped.look';
+// Chrome on Windows occasionally reports one pointer-locked move of several
+// hundred pixels that never happened; a real flick is spread over frames.
+const MAX_MOVE = 120;
+
+function storedScale() {
+  try { return Number(localStorage.getItem(SENSITIVITY_KEY)) || 1; } catch { return 1; }
+}
 const PITCH_LIMIT = Math.PI / 2 - 0.05;
 // A rise this small is walked up rather than fallen off. It has to stay well
 // under the step between two platforms on a course, or you could walk the
@@ -80,6 +90,7 @@ export class Stage extends EventTarget {
     this.groundAt = () => 0;
     /** How much of a jump the world is willing to give. Pulse reads the beat. */
     this.jumpPower = () => 1;
+    this.lookScale = storedScale();
 
     this._bindInput();
     window.addEventListener('resize', () => this.resize());
@@ -102,6 +113,12 @@ export class Stage extends EventTarget {
       if (event.code === 'KeyL') this.dispatchEvent(new Event('landscape'));
       if (event.code === 'KeyT') this.dispatchEvent(new Event('trailer'));
       if (event.code === 'KeyM') this.dispatchEvent(new Event('mission'));
+      if (event.code === 'Minus' || event.code === 'Equal') {
+        const factor = event.code === 'Minus' ? 1 / 1.25 : 1.25;
+        this.lookScale = Math.min(4, Math.max(0.25, this.lookScale * factor));
+        try { localStorage.setItem(SENSITIVITY_KEY, String(this.lookScale)); } catch { /* fine */ }
+        this.dispatchEvent(new CustomEvent('sensitivity', { detail: this.lookScale }));
+      }
     });
     document.addEventListener('keyup', (event) => {
       this.keys.delete(event.code);
@@ -134,8 +151,12 @@ export class Stage extends EventTarget {
     window.addEventListener('mousemove', (event) => {
       if (!this.active) return;
       if (!this.captured && !this.dragging) return;
-      this.yaw -= event.movementX * LOOK_SENSITIVITY;
-      this.pitch -= event.movementY * LOOK_SENSITIVITY;
+      const dx = event.movementX;
+      const dy = event.movementY;
+      if (Math.abs(dx) > MAX_MOVE || Math.abs(dy) > MAX_MOVE) return;
+      const k = LOOK_SENSITIVITY * this.lookScale;
+      this.yaw -= dx * k;
+      this.pitch -= dy * k;
       this.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.pitch));
     });
 
@@ -147,8 +168,8 @@ export class Stage extends EventTarget {
     canvas.addEventListener('touchmove', (e) => {
       if (!this.active || !lastTouch) return;
       const touch = e.touches[0];
-      this.yaw -= (touch.clientX - lastTouch.clientX) * LOOK_SENSITIVITY * 1.6;
-      this.pitch -= (touch.clientY - lastTouch.clientY) * LOOK_SENSITIVITY * 1.6;
+      this.yaw -= (touch.clientX - lastTouch.clientX) * LOOK_SENSITIVITY * 3;
+      this.pitch -= (touch.clientY - lastTouch.clientY) * LOOK_SENSITIVITY * 3;
       this.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.pitch));
       lastTouch = touch;
     }, { passive: true });
@@ -171,8 +192,14 @@ export class Stage extends EventTarget {
   enter() {
     this.active = true;
     try {
-      const request = this.canvas.requestPointerLock?.({ unadjustedMovement: false });
-      if (request && typeof request.catch === 'function') request.catch(() => {});
+      // Raw mouse input where the browser offers it: without it Windows
+      // acceleration turns a small quick move into a huge turn.
+      const request = this.canvas.requestPointerLock?.({ unadjustedMovement: true });
+      if (request && typeof request.catch === 'function') {
+        request.catch(() => {
+          try { this.canvas.requestPointerLock?.()?.catch?.(() => {}); } catch { /* drag-look */ }
+        });
+      }
     } catch {
       /* pointer lock refused (iframe, embedded browser): drag-look still works */
     }

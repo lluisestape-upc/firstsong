@@ -96,6 +96,11 @@ function faceTowards(stage, from, to) {
   stage.pitch = -0.16;
 }
 
+// ?event: the build shown at a stand. Every visitor gets the first-time
+// experience (tutorial, no stars), and the key left of 1 starts it all over.
+const EVENT = new URLSearchParams(location.search).has('event');
+const EVENT_KEY = 'Backquote';
+
 function readMode() {
   const asked = new URLSearchParams(location.search).get('mode');
   return MODES.includes(asked) ? asked : 'discover';
@@ -121,6 +126,15 @@ function bindModes(onPick) {
 
 async function boot() {
   const stage = new Stage(document.getElementById('stage'));
+  if (EVENT) {
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('firstsong.tutorial') || key.startsWith('unwrapped.stars')) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch { /* storage refused: nothing is remembered anyway */ }
+  }
 
   let world;
   try {
@@ -325,6 +339,9 @@ async function boot() {
   ].filter((m) => m.needs.every((name) => monumentNamed(name))),
   { key: `unwrapped.stars.${world.id}`, ctx: mix.ctx });
   stage.addEventListener('mission', () => missions.skip());
+  stage.addEventListener('sensitivity', (event) => {
+    sky.announce(`mouse ${Math.round(event.detail * 100)}%`, 1.5);
+  });
   const teachingNow = () => tutorial.active || tableTutorial.active;
 
   const TABLE_SIGN = 'set an effect next to an instrument';
@@ -383,6 +400,41 @@ async function boot() {
   // Set by H: the next start of Discover or Play teaches again, even to a
   // browser that remembers having finished the tutorial.
   let teachAgain = false;
+  let fromTheTop = false;
+
+  // The next visitor: silence, sleeping instruments, the tutorial, no stars,
+  // the song from the top, the first landscape. Works from the menu too.
+  const firstBiome = environment.biome;
+  function nextVisitor() {
+    inspector.cancel();
+    recorder.stop?.();
+    document.body.classList.remove('cinematic');
+    sky.quiet = false;
+    sky.untitle();
+    sky.unpin();
+    if (firstBiome && environment.biome !== firstBiome) {
+      environment.set(firstBiome);
+      showLandscape();
+    }
+    missions.reset();
+    tutorial.stop();
+    tableTutorial.stop();
+    table.hide();
+    // From the menu the song is paused and cannot seek: do it on the way in.
+    fromTheTop = !mix.seek(0);
+    stage.yaw = 0;
+    // The menu too, or the next "Step inside" would start whatever the last
+    // visitor had picked.
+    dom.modes.querySelector('[data-mode="discover"]')?.click();
+    running = null;
+    teachAgain = true;
+    startMode('discover');
+  }
+  if (EVENT) {
+    document.addEventListener('keydown', (event) => {
+      if (event.code === EVENT_KEY && !event.repeat) nextVisitor();
+    });
+  }
 
   document.addEventListener('keydown', (event) => {
     if (event.code !== 'KeyH' || event.defaultPrevented) return;
@@ -607,6 +659,7 @@ async function boot() {
     // Picking a different mode from the card starts it; picking the one that
     // is already running just drops you back into it.
     startMode(mode);
+    if (fromTheTop) { mix.seek(0); fromTheTop = false; }
     setPauseLabel();
     stage.enter();
   });
@@ -620,8 +673,8 @@ async function boot() {
     // One frame later the pointerlockchange event has settled.
     setTimeout(() => {
       dom.controls.textContent = stage.needsDragHint
-        ? 'W A S D walk · drag to look · F listen · E take · Enter inside an effect · Esc let go'
-        : 'W A S D walk · mouse to look · F listen · E take · Enter inside an effect · Esc let go';
+        ? 'W A S D walk · drag to look · F listen · E take · Enter inside an effect · H tutorial · Esc let go'
+        : 'W A S D walk · mouse to look (- = speed) · F listen · E take · Enter inside an effect · H tutorial · Esc let go';
     }, 120);
   });
   const setPauseLabel = () => {
@@ -651,6 +704,7 @@ async function boot() {
   window.__firstsong = {
     stage, mix, world, monuments, environment, interaction, trail, pad, sky,
     blind, beat, course, recorder, words, table, inspector, tutorial, tableTutorial, missions, seen,
+    nextVisitor,
   };
 
   let elapsed = 0;

@@ -63,6 +63,16 @@ export class Missions {
     this.index = -1;
   }
 
+  /** Forget every star for this song: a new visitor starts with none. */
+  reset() {
+    this.done.clear();
+    save(this.key, this.done);
+    this.lesson = 0;
+    this.fresh = null;
+    this._pick(0);
+    this._render();
+  }
+
   show(on) {
     this.active = on;
     this.root.classList.toggle('hidden', !on);
